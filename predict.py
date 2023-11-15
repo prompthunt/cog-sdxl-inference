@@ -155,14 +155,14 @@ class Predictor(BasePredictor):
 
         self.tuned_model = True
 
-    def setup(self, weights: Optional[Path] = None):
+    def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
 
         start = time.time()
         self.tuned_model = False
         self.tuned_weights = None
-        if str(weights) == "weights":
-            weights = None
+
+        weights = None
 
         self.weights_cache = WeightsDownloadCache()
 
@@ -254,6 +254,10 @@ class Predictor(BasePredictor):
     @torch.inference_mode()
     def predict(
         self,
+        lora_weights: str = Input(
+            description="LoRA weights to use. Leave blank to use the default weights.",
+            default=None,
+        ),
         prompt: str = Input(
             description="Input prompt",
             default="An astronaut riding a rainbow unicorn",
@@ -329,23 +333,19 @@ class Predictor(BasePredictor):
             le=1.0,
             default=0.6,
         ),
-        replicate_weights: str = Input(
-            description="Replicate LoRA weights to use. Leave blank to use the default weights.",
-            default=None,
-        ),
         disable_safety_checker: bool = Input(
             description="Disable safety checker for generated images. This feature is only available through the API. See [https://replicate.com/docs/how-does-replicate-work#safety](https://replicate.com/docs/how-does-replicate-work#safety)",
-            default=False
-        )
+            default=False,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
             seed = int.from_bytes(os.urandom(2), "big")
         print(f"Using seed: {seed}")
 
-        if replicate_weights:
-            self.load_trained_weights(replicate_weights, self.txt2img_pipe)
-        
+        if lora_weights:
+            self.load_trained_weights(lora_weights, self.txt2img_pipe)
+
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:
             self.txt2img_pipe.vae.to(dtype=torch.float16)

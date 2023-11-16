@@ -184,6 +184,8 @@ class Predictor(BasePredictor):
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
 
+        self.weights_cache = WeightsDownloadCache()
+
         self.feature_extractor = CLIPImageProcessor.from_pretrained(FEATURE_EXTRACTOR)
 
         if not os.path.exists(SDXL_MODEL_CACHE):

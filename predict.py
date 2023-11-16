@@ -45,7 +45,12 @@ SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 
 class KarrasDPM:
     def from_config(config):
-        return DPMSolverMultistepScheduler.from_config(config, use_karras_sigmas=True)
+        return DPMSolverMultistepScheduler.from_config(
+            config,
+            use_karras_sigmas=True,
+            euler_at_final=True,
+            algorithm_type="sde-dpmsolver++",
+        )
 
 
 SCHEDULERS = {

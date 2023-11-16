@@ -343,6 +343,10 @@ class Predictor(BasePredictor):
             seed = int.from_bytes(os.urandom(2), "big")
         print(f"Using seed: {seed}")
 
+        self.txt2img_pipe.unload_lora_weights()
+        self.img2img_pipe.unload_lora_weights()
+        self.inpaint_pipe.unload_lora_weights()
+
         if lora_weights:
             self.load_trained_weights(lora_weights, self.txt2img_pipe)
 

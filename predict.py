@@ -343,6 +343,10 @@ class Predictor(BasePredictor):
             seed = int.from_bytes(os.urandom(2), "big")
         print(f"Using seed: {seed}")
 
+        # Delete ./weights-cache to force a re-download of weights
+        if os.path.exists("./weights-cache"):
+            shutil.rmtree("./weights-cache")
+
         self.txt2img_pipe.unload_lora_weights()
         self.img2img_pipe.unload_lora_weights()
         self.inpaint_pipe.unload_lora_weights()

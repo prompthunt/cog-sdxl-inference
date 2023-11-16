@@ -20,6 +20,10 @@ from diffusers import (
     PNDMScheduler,
     StableDiffusionXLImg2ImgPipeline,
     StableDiffusionXLInpaintPipeline,
+    ControlNetModel,
+    StableDiffusionXLControlNetPipeline,
+    StableDiffusionXLControlNetImg2ImgPipeline,
+    StableDiffusionXLControlNetInpaintPipeline,
 )
 from diffusers.models.attention_processor import LoRAAttnProcessor2_0
 from diffusers.pipelines.stable_diffusion.safety_checker import (
@@ -157,85 +161,78 @@ class Predictor(BasePredictor):
 
         self.tuned_model = True
 
+    def build_controlnet_pipeline(self, pipeline_class, controlnet):
+        pipe = pipeline_class.from_pretrained(
+            SDXL_MODEL_CACHE,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16",
+            vae=self.txt2img_pipe.vae,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            text_encoder_2=self.txt2img_pipe.text_encoder_2,
+            tokenizer=self.txt2img_pipe.tokenizer,
+            tokenizer_2=self.txt2img_pipe.tokenizer_2,
+            unet=self.txt2img_pipe.unet,
+            scheduler=self.txt2img_pipe.scheduler,
+            controlnet=controlnet,
+        )
+
+        pipe.to("cuda")
+
+        return pipe
+
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
 
-        start = time.time()
-        self.tuned_model = False
-        self.tuned_weights = None
-
-        weights = None
-
-        self.weights_cache = WeightsDownloadCache()
-
-        print("Loading safety checker...")
-        if not os.path.exists(SAFETY_CACHE):
-            download_weights(SAFETY_URL, SAFETY_CACHE)
-        self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
-            SAFETY_CACHE, torch_dtype=torch.float16
-        ).to("cuda")
         self.feature_extractor = CLIPImageProcessor.from_pretrained(FEATURE_EXTRACTOR)
 
         if not os.path.exists(SDXL_MODEL_CACHE):
             download_weights(SDXL_URL, SDXL_MODEL_CACHE)
 
-        print("Loading sdxl txt2img pipeline...")
-        self.txt2img_pipe = DiffusionPipeline.from_pretrained(
-            SDXL_MODEL_CACHE,
-            torch_dtype=torch.float16,
-            use_safetensors=True,
-            variant="fp16",
-        )
-        self.is_lora = False
-        if weights or os.path.exists("./trained-model"):
-            self.load_trained_weights(weights, self.txt2img_pipe)
+        # print("Loading SDXL img2img pipeline...")
+        # self.img2img_pipe = StableDiffusionXLImg2ImgPipeline(
+        #     vae=self.txt2img_pipe.vae,
+        #     text_encoder=self.txt2img_pipe.text_encoder,
+        #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
+        #     tokenizer=self.txt2img_pipe.tokenizer,
+        #     tokenizer_2=self.txt2img_pipe.tokenizer_2,
+        #     unet=self.txt2img_pipe.unet,
+        #     scheduler=self.txt2img_pipe.scheduler,
+        # )
+        # self.img2img_pipe.to("cuda")
 
-        self.txt2img_pipe.to("cuda")
+        # print("Loading SDXL inpaint pipeline...")
+        # self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
+        #     vae=self.txt2img_pipe.vae,
+        #     text_encoder=self.txt2img_pipe.text_encoder,
+        #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
+        #     tokenizer=self.txt2img_pipe.tokenizer,
+        #     tokenizer_2=self.txt2img_pipe.tokenizer_2,
+        #     unet=self.txt2img_pipe.unet,
+        #     scheduler=self.txt2img_pipe.scheduler,
+        # )
+        # self.inpaint_pipe.to("cuda")
 
-        print("Loading SDXL img2img pipeline...")
-        self.img2img_pipe = StableDiffusionXLImg2ImgPipeline(
-            vae=self.txt2img_pipe.vae,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            text_encoder_2=self.txt2img_pipe.text_encoder_2,
-            tokenizer=self.txt2img_pipe.tokenizer,
-            tokenizer_2=self.txt2img_pipe.tokenizer_2,
-            unet=self.txt2img_pipe.unet,
-            scheduler=self.txt2img_pipe.scheduler,
-        )
-        self.img2img_pipe.to("cuda")
+        # print("Loading SDXL refiner pipeline...")
+        # # FIXME(ja): should the vae/text_encoder_2 be loaded from SDXL always?
+        # #            - in the case of fine-tuned SDXL should we still?
+        # # FIXME(ja): if the answer to above is use VAE/Text_Encoder_2 from fine-tune
+        # #            what does this imply about lora + refiner? does the refiner need to know about
 
-        print("Loading SDXL inpaint pipeline...")
-        self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
-            vae=self.txt2img_pipe.vae,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            text_encoder_2=self.txt2img_pipe.text_encoder_2,
-            tokenizer=self.txt2img_pipe.tokenizer,
-            tokenizer_2=self.txt2img_pipe.tokenizer_2,
-            unet=self.txt2img_pipe.unet,
-            scheduler=self.txt2img_pipe.scheduler,
-        )
-        self.inpaint_pipe.to("cuda")
+        # if not os.path.exists(REFINER_MODEL_CACHE):
+        #     download_weights(REFINER_URL, REFINER_MODEL_CACHE)
 
-        print("Loading SDXL refiner pipeline...")
-        # FIXME(ja): should the vae/text_encoder_2 be loaded from SDXL always?
-        #            - in the case of fine-tuned SDXL should we still?
-        # FIXME(ja): if the answer to above is use VAE/Text_Encoder_2 from fine-tune
-        #            what does this imply about lora + refiner? does the refiner need to know about
-
-        if not os.path.exists(REFINER_MODEL_CACHE):
-            download_weights(REFINER_URL, REFINER_MODEL_CACHE)
-
-        print("Loading refiner pipeline...")
-        self.refiner = DiffusionPipeline.from_pretrained(
-            REFINER_MODEL_CACHE,
-            text_encoder_2=self.txt2img_pipe.text_encoder_2,
-            vae=self.txt2img_pipe.vae,
-            torch_dtype=torch.float16,
-            use_safetensors=True,
-            variant="fp16",
-        )
-        self.refiner.to("cuda")
-        print("setup took: ", time.time() - start)
+        # print("Loading refiner pipeline...")
+        # self.refiner = DiffusionPipeline.from_pretrained(
+        #     REFINER_MODEL_CACHE,
+        #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
+        #     vae=self.txt2img_pipe.vae,
+        #     torch_dtype=torch.float16,
+        #     use_safetensors=True,
+        #     variant="fp16",
+        # )
+        # self.refiner.to("cuda")
+        # print("setup took: ", time.time() - start)
         # self.txt2img_pipe.__class__.encode_prompt = new_encode_prompt
 
     def load_image(self, path):
@@ -337,13 +334,44 @@ class Predictor(BasePredictor):
         ),
         disable_safety_checker: bool = Input(
             description="Disable safety checker for generated images. This feature is only available through the API. See [https://replicate.com/docs/how-does-replicate-work#safety](https://replicate.com/docs/how-does-replicate-work#safety)",
-            default=False,
+            default=True,
+        ),
+        pose_image: Path = Input(
+            description="Pose image for controlnet",
+            default=None,
+        ),
+        controlnet_conditioning_scale: float = Input(
+            description="How strong the controlnet conditioning is",
+            ge=0.0,
+            le=4.0,
+            default=0.75,
+        ),
+        controlnet_start: float = Input(
+            description="When controlnet conditioning starts",
+            ge=0.0,
+            le=1.0,
+            default=0.0,
+        ),
+        controlnet_end: float = Input(
+            description="When controlnet conditioning ends",
+            ge=0.0,
+            le=1.0,
+            default=1.0,
         ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
             seed = int.from_bytes(os.urandom(2), "big")
         print(f"Using seed: {seed}")
+
+        print("Loading sdxl txt2img pipeline...")
+        self.txt2img_pipe = DiffusionPipeline.from_pretrained(
+            SDXL_MODEL_CACHE,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16",
+        )
+        self.txt2img_pipe.to("cuda")
 
         self.txt2img_pipe.unload_lora_weights()
         self.img2img_pipe.unload_lora_weights()
@@ -352,16 +380,43 @@ class Predictor(BasePredictor):
         if lora_weights:
             self.load_trained_weights(lora_weights, self.txt2img_pipe)
 
+        print("Loading SDXL img2img pipeline...")
+        self.img2img_pipe = StableDiffusionXLImg2ImgPipeline(
+            vae=self.txt2img_pipe.vae,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            text_encoder_2=self.txt2img_pipe.text_encoder_2,
+            tokenizer=self.txt2img_pipe.tokenizer,
+            tokenizer_2=self.txt2img_pipe.tokenizer_2,
+            unet=self.txt2img_pipe.unet,
+            scheduler=self.txt2img_pipe.scheduler,
+        )
+        self.img2img_pipe.to("cuda")
+
+        print("Loading SDXL inpaint pipeline...")
+        self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
+            vae=self.txt2img_pipe.vae,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            text_encoder_2=self.txt2img_pipe.text_encoder_2,
+            tokenizer=self.txt2img_pipe.tokenizer,
+            tokenizer_2=self.txt2img_pipe.tokenizer_2,
+            unet=self.txt2img_pipe.unet,
+            scheduler=self.txt2img_pipe.scheduler,
+        )
+        self.inpaint_pipe.to("cuda")
+
+        print("Loading controlnet model")
+        self.controlnet = ControlNetModel.from_pretrained(
+            "thibaud/controlnet-openpose-sdxl-1.0",
+            torch_dtype=torch.float16,
+            cache_dir="/src/controlnet-cache",
+        )
+        self.controlnet.to("cuda")
+
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:
             self.txt2img_pipe.vae.to(dtype=torch.float16)
 
         sdxl_kwargs = {}
-        if self.tuned_model:
-            # consistency with fine-tuning API
-            for k, v in self.token_map.items():
-                prompt = prompt.replace(k, v)
-        print(f"Prompt: {prompt}")
         if image and mask:
             print("inpainting mode")
             sdxl_kwargs["image"] = self.load_image(image)
@@ -369,17 +424,55 @@ class Predictor(BasePredictor):
             sdxl_kwargs["strength"] = prompt_strength
             sdxl_kwargs["width"] = width
             sdxl_kwargs["height"] = height
-            pipe = self.inpaint_pipe
         elif image:
             print("img2img mode")
             sdxl_kwargs["image"] = self.load_image(image)
             sdxl_kwargs["strength"] = prompt_strength
-            pipe = self.img2img_pipe
         else:
             print("txt2img mode")
             sdxl_kwargs["width"] = width
             sdxl_kwargs["height"] = height
-            pipe = self.txt2img_pipe
+
+        controlnet_args = {
+            "controlnet_conditioning_scale": controlnet_conditioning_scale,
+            "control_guidance_start": controlnet_start,
+            "control_guidance_end": controlnet_end,
+        }
+
+        if pose_image:
+            pose_image = self.load_image(pose_image)
+            if image and mask:
+                controlnet_args["control_image"] = pose_image
+                pipe = self.build_controlnet_pipeline(
+                    StableDiffusionXLControlNetInpaintPipeline,
+                    self.controlnet,
+                )
+            elif image:
+                controlnet_args["control_image"] = pose_image
+                pipe = self.build_controlnet_pipeline(
+                    StableDiffusionXLControlNetImg2ImgPipeline,
+                    self.controlnet,
+                )
+            else:
+                controlnet_args["image"] = pose_image
+                pipe = self.build_controlnet_pipeline(
+                    StableDiffusionXLControlNetPipeline,
+                    self.controlnet,
+                )
+
+        else:
+            if image and mask:
+                pipe = self.inpaint_pipe
+            elif image:
+                pipe = self.img2img_pipe
+            else:
+                pipe = self.txt2img_pipe
+
+        if self.tuned_model:
+            # consistency with fine-tuning API
+            for k, v in self.token_map.items():
+                prompt = prompt.replace(k, v)
+        print(f"Prompt: {prompt}")
 
         if refine == "expert_ensemble_refiner":
             sdxl_kwargs["output_type"] = "latent"

@@ -433,13 +433,14 @@ class Predictor(BasePredictor):
             sdxl_kwargs["width"] = width
             sdxl_kwargs["height"] = height
 
-        controlnet_args = {
-            "controlnet_conditioning_scale": controlnet_conditioning_scale,
-            "control_guidance_start": controlnet_start,
-            "control_guidance_end": controlnet_end,
-        }
+        controlnet_args = {}
 
         if pose_image:
+            controlnet_args = {
+                "controlnet_conditioning_scale": controlnet_conditioning_scale,
+                "control_guidance_start": controlnet_start,
+                "control_guidance_end": controlnet_end,
+            }
             pose_image = self.load_image(pose_image)
             if image and mask:
                 controlnet_args["control_image"] = pose_image
@@ -500,7 +501,7 @@ class Predictor(BasePredictor):
         if self.is_lora:
             sdxl_kwargs["cross_attention_kwargs"] = {"scale": lora_scale}
 
-        output = pipe(**common_args, **sdxl_kwargs)
+        output = pipe(**common_args, **sdxl_kwargs, **controlnet_args)
 
         if refine in ["expert_ensemble_refiner", "base_image_refiner"]:
             refiner_kwargs = {

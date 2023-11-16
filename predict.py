@@ -57,7 +57,7 @@ SCHEDULERS = {
     "DDIM": DDIMScheduler,
     "DPMSolverMultistep": DPMSolverMultistepScheduler,
     "HeunDiscrete": HeunDiscreteScheduler,
-    "KarrasDPM": KarrasDPM,
+    "DPM++SDEKarras": KarrasDPM,
     "K_EULER_ANCESTRAL": EulerAncestralDiscreteScheduler,
     "K_EULER": EulerDiscreteScheduler,
     "PNDM": PNDMScheduler,

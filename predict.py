@@ -347,6 +347,9 @@ class Predictor(BasePredictor):
         if os.path.exists("./weights-cache"):
             shutil.rmtree("./weights-cache")
 
+        # Create a new cache directory
+        os.mkdir("./weights-cache")
+
         self.txt2img_pipe.unload_lora_weights()
         self.img2img_pipe.unload_lora_weights()
         self.inpaint_pipe.unload_lora_weights()

@@ -384,6 +384,14 @@ class Predictor(BasePredictor):
         # inpaint_controlnet_conditioning_scale
         # inpaint_controlnet_start
         # inpaint_controlnet_end
+        inpaint_prompt: str = Input(
+            description="Input prompt",
+            default="A photo of TOK",
+        ),
+        inpaint_negative_prompt: str = Input(
+            description="Input Negative Prompt",
+            default="",
+        ),
         inpaint_num_inference_steps: int = Input(
             description="Number of denoising steps", ge=1, le=500, default=25
         ),
@@ -620,8 +628,8 @@ class Predictor(BasePredictor):
 
             inpaint_generator = torch.Generator("cuda").manual_seed(seed)
             common_args = {
-                "prompt": [prompt] * num_outputs,
-                "negative_prompt": [negative_prompt] * num_outputs,
+                "prompt": [inpaint_prompt] * num_outputs,
+                "negative_prompt": [inpaint_negative_prompt] * num_outputs,
                 "guidance_scale": inpaint_guidance_scale,
                 "generator": inpaint_generator,
                 "num_inference_steps": inpaint_num_inference_steps,
@@ -661,7 +669,7 @@ class Predictor(BasePredictor):
                 left_top,
                 inpaint_pass.images[0],
                 orig_size,
-                head_mask
+                head_mask,
             )
 
             # Save both inpaint result and pasted image to output_paths

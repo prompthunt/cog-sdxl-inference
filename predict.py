@@ -36,6 +36,7 @@ from diffusers.utils import load_image
 from safetensors import safe_open
 from safetensors.torch import load_file
 from transformers import CLIPImageProcessor
+from PIL import Image
 
 from dataset_and_utils import TokenEmbeddingsHandler
 

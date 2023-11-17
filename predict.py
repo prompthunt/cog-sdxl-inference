@@ -568,8 +568,10 @@ class Predictor(BasePredictor):
                 head_mask,
             ]
             for i, image in enumerate(images_to_add):
-                output_path = f"/tmp/out-processing-{i}.png"
-                image.save(output_path)
-                output_paths.append(Path(output_path))
+                # If image is image and exists
+                if image and image.size:
+                    output_path = f"/tmp/out-processing-{i}.png"
+                    image.save(output_path)
+                    output_paths.append(Path(output_path))
 
         return output_paths

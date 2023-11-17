@@ -610,7 +610,7 @@ class Predictor(BasePredictor):
                 face_resize_to,
             )
 
-            head_mask = get_head_mask(cropped_face, mask_blur_amount)
+            head_mask, head_mask_no_blur = get_head_mask(cropped_face, mask_blur_amount)
 
             # Add all to output_paths
             images_to_add = [
@@ -669,7 +669,7 @@ class Predictor(BasePredictor):
                 left_top,
                 inpaint_pass.images[0],
                 orig_size,
-                head_mask,
+                head_mask_no_blur,
             )
 
             # Save both inpaint result and pasted image to output_paths

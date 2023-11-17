@@ -1,3 +1,6 @@
+# Ignore line too long
+# flake8: noqa: E501
+
 import hashlib
 import json
 import os
@@ -35,6 +38,11 @@ from safetensors.torch import load_file
 from transformers import CLIPImageProcessor
 
 from dataset_and_utils import TokenEmbeddingsHandler
+
+from gfpgan import GFPGANer
+from realesrgan.utils import RealESRGANer
+from basicsr.archs.srvgg_arch import SRVGGNetCompact
+import cv2
 
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
@@ -78,6 +86,36 @@ def download_weights(url, dest):
 
 
 class Predictor(BasePredictor):
+    def upscale_image_pil(self, img: Image.Image) -> Image.Image:
+        weight = 0.5
+        try:
+            # Convert PIL Image to numpy array if necessary
+            img = np.array(img)
+            if len(img.shape) == 2 or (len(img.shape) == 3 and img.shape[2] == 1):
+                # Convert grayscale to RGB
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            h, w = img.shape[0:2]
+            if h < 300:
+                img = cv2.resize(img, (w * 2, h * 2), interpolation=cv2.INTER_LANCZOS4)
+
+            # Enhance the image using GFPGAN
+            _, _, output = self.face_enhancer.enhance(
+                img,
+                has_aligned=False,
+                only_center_face=False,
+                paste_back=True,
+                weight=weight,
+            )
+
+            # Convert numpy array back to PIL Image
+            output = Image.fromarray(output)
+
+            return output
+
+        except Exception as error:
+            print("An exception occurred:", error)
+            raise
+
     def load_trained_weights(self, weights, pipe):
         from no_init import no_init_or_tensor
 
@@ -191,6 +229,46 @@ class Predictor(BasePredictor):
 
         if not os.path.exists(SDXL_MODEL_CACHE):
             download_weights(SDXL_URL, SDXL_MODEL_CACHE)
+
+        if not os.path.exists("gfpgan/weights/realesr-general-x4v3.pth"):
+            os.system(
+                "wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth -P ./gfpgan/weights"
+            )
+        if not os.path.exists("gfpgan/weights/GFPGANv1.4.pth"):
+            os.system(
+                "wget https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth -P ./gfpgan/weights"
+            )
+
+        # background enhancer with RealESRGAN
+        model = SRVGGNetCompact(
+            num_in_ch=3,
+            num_out_ch=3,
+            num_feat=64,
+            num_conv=32,
+            upscale=4,
+            act_type="prelu",
+        )
+        model_path = "gfpgan/weights/realesr-general-x4v3.pth"
+        half = True if torch.cuda.is_available() else False
+        self.upsampler = RealESRGANer(
+            scale=2,
+            model_path=model_path,
+            model=model,
+            tile=0,
+            tile_pad=10,
+            pre_pad=0,
+            half=half,
+        )
+
+        # Use GFPGAN for face enhancement
+        self.face_enhancer = GFPGANer(
+            model_path="gfpgan/weights/GFPGANv1.4.pth",
+            upscale=1,
+            arch="clean",
+            channel_multiplier=2,
+            bg_upsampler=self.upsampler,
+        )
+        self.current_version = "v1.4"
 
         # print("Loading SDXL img2img pipeline...")
         # self.img2img_pipe = StableDiffusionXLImg2ImgPipeline(
@@ -375,6 +453,10 @@ class Predictor(BasePredictor):
         face_resize_to: int = Input(
             description="Resize the face bounding box to this size (in pixels).",
             default=1024,
+        ),
+        upscale_face: bool = Input(
+            description="Upscale the face using GFPGAN",
+            default=False,
         ),
         # ADD
         # inpaint_num_inference_steps
@@ -637,7 +719,16 @@ class Predictor(BasePredictor):
 
             inpaint_kwargs = {}
 
-            inpaint_kwargs["image"] = cropped_face
+            if upscale_face:
+                upscaled_face = self.upscale_image_pil(cropped_face)
+                # Add to output_paths
+                output_path = f"/tmp/out-upscale-face.png"
+                upscaled_face.save(output_path)
+                output_paths.append(Path(output_path))
+            else:
+                upscaled_face = cropped_face
+
+            inpaint_kwargs["image"] = upscaled_face
             inpaint_kwargs["mask_image"] = head_mask
             inpaint_kwargs["strength"] = inpaint_strength
             inpaint_kwargs["width"] = cropped_face.width

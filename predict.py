@@ -638,7 +638,7 @@ class Predictor(BasePredictor):
             inpaint_kwargs = {}
 
             inpaint_kwargs["image"] = cropped_face
-            inpaint_kwargs["mask_image"] = cropped_mask
+            inpaint_kwargs["mask_image"] = head_mask
             inpaint_kwargs["strength"] = inpaint_strength
             inpaint_kwargs["width"] = cropped_face.width
             inpaint_kwargs["height"] = cropped_face.height

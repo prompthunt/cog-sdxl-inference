@@ -531,7 +531,6 @@ class Predictor(BasePredictor):
 
         # fix_face
         if fix_face:
-            from face_fixer import face_fixer
             from image_processing import (
                 face_mask_google_mediapipe,
                 crop_faces_to_square,

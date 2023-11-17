@@ -36,6 +36,7 @@ from transformers import CLIPImageProcessor
 
 from dataset_and_utils import TokenEmbeddingsHandler
 
+
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
 SAFETY_CACHE = "./safety-cache"
@@ -360,6 +361,21 @@ class Predictor(BasePredictor):
             le=1.0,
             default=1.0,
         ),
+        fix_face: bool = Input(
+            description="Fix the face in the image",
+            default=False,
+        ),
+        mask_blur_amount: float = Input(
+            description="Amount of blur to apply to the mask.", default=8.0
+        ),
+        face_padding: float = Input(
+            description="Amount of padding (as percentage) to add to the face bounding box.",
+            default=2,
+        ),
+        face_resize_to: int = Input(
+            description="Resize the face bounding box to this size (in pixels).",
+            default=1024,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
@@ -501,40 +517,60 @@ class Predictor(BasePredictor):
         if self.is_lora:
             sdxl_kwargs["cross_attention_kwargs"] = {"scale": lora_scale}
 
-        output = pipe(**common_args, **sdxl_kwargs, **controlnet_args)
-
-        if refine in ["expert_ensemble_refiner", "base_image_refiner"]:
-            refiner_kwargs = {
-                "image": output.images,
-            }
-
-            if refine == "expert_ensemble_refiner":
-                refiner_kwargs["denoising_start"] = high_noise_frac
-            if refine == "base_image_refiner" and refine_steps:
-                common_args["num_inference_steps"] = refine_steps
-
-            output = self.refiner(**common_args, **refiner_kwargs)
+        first_pass = pipe(**common_args, **sdxl_kwargs, **controlnet_args)
 
         if not apply_watermark:
             pipe.watermark = watermark_cache
             self.refiner.watermark = watermark_cache
 
-        if not disable_safety_checker:
-            _, has_nsfw_content = self.run_safety_checker(output.images)
-
         output_paths = []
-        for i, image in enumerate(output.images):
-            if not disable_safety_checker:
-                if has_nsfw_content[i]:
-                    print(f"NSFW content detected in image {i}")
-                    continue
+        for i, image in enumerate(first_pass.images):
             output_path = f"/tmp/out-{i}.png"
             image.save(output_path)
             output_paths.append(Path(output_path))
 
-        if len(output_paths) == 0:
-            raise Exception(
-                f"NSFW content detected. Try running it again, or try a different prompt."
+        # fix_face
+        if fix_face:
+            from face_fixer import face_fixer
+            from image_processing import (
+                face_mask_google_mediapipe,
+                crop_faces_to_square,
+                paste_inpaint_into_original_image,
+                get_head_mask,
             )
+
+            face_masks = face_mask_google_mediapipe(
+                first_pass.images, mask_blur_amount, 0
+            )
+
+            # Based on face detection, crop base image, mask image and pose image (if available)
+            # to the face and save them to output_paths
+            (
+                cropped_face,
+                cropped_mask,
+                cropped_control,
+                left_top,
+                orig_size,
+            ) = crop_faces_to_square(
+                first_pass.images[0],
+                face_masks[0],
+                pose_image,
+                face_padding,
+                face_resize_to,
+            )
+
+            head_mask = get_head_mask(cropped_face, mask_blur_amount)
+
+            # Add all to output_paths
+            images_to_add = [
+                cropped_face,
+                cropped_mask,
+                cropped_control,
+                head_mask,
+            ]
+            for i, image in enumerate(images_to_add):
+                output_path = f"/tmp/out-processing-{i}.png"
+                image.save(output_path)
+                output_paths.append(Path(output_path))
 
         return output_paths

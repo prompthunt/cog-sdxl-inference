@@ -661,6 +661,7 @@ class Predictor(BasePredictor):
                 left_top,
                 inpaint_pass.images[0],
                 orig_size,
+                head_mask
             )
 
             # Save both inpaint result and pasted image to output_paths

@@ -376,6 +376,50 @@ class Predictor(BasePredictor):
             description="Resize the face bounding box to this size (in pixels).",
             default=1024,
         ),
+        # ADD
+        # inpaint_num_inference_steps
+        # inpaint_guidance_scale
+        # inpaint_strength
+        # inpaint_lora_scale
+        # inpaint_controlnet_conditioning_scale
+        # inpaint_controlnet_start
+        # inpaint_controlnet_end
+        inpaint_num_inference_steps: int = Input(
+            description="Number of denoising steps", ge=1, le=500, default=25
+        ),
+        inpaint_guidance_scale: float = Input(
+            description="Scale for classifier-free guidance", ge=1, le=50, default=3
+        ),
+        inpaint_strength: float = Input(
+            description="Prompt strength when using img2img / inpaint. 1.0 corresponds to full destruction of information in image",
+            ge=0.0,
+            le=1.0,
+            default=0.35,
+        ),
+        inpaint_lora_scale: float = Input(
+            description="LoRA additive scale. Only applicable on trained models.",
+            ge=0.0,
+            le=1.0,
+            default=0.6,
+        ),
+        inpaint_controlnet_conditioning_scale: float = Input(
+            description="How strong the controlnet conditioning is",
+            ge=0.0,
+            le=4.0,
+            default=0.75,
+        ),
+        inpaint_controlnet_start: float = Input(
+            description="When controlnet conditioning starts",
+            ge=0.0,
+            le=1.0,
+            default=0.0,
+        ),
+        inpaint_controlnet_end: float = Input(
+            description="When controlnet conditioning ends",
+            ge=0.0,
+            le=1.0,
+            default=1.0,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
@@ -573,5 +617,61 @@ class Predictor(BasePredictor):
                     output_path = f"/tmp/out-processing-{i}.png"
                     image.save(output_path)
                     output_paths.append(Path(output_path))
+
+            inpaint_generator = torch.Generator("cuda").manual_seed(seed)
+            common_args = {
+                "prompt": [prompt] * num_outputs,
+                "negative_prompt": [negative_prompt] * num_outputs,
+                "guidance_scale": inpaint_guidance_scale,
+                "generator": inpaint_generator,
+                "num_inference_steps": inpaint_num_inference_steps,
+            }
+
+            inpaint_kwargs = {}
+
+            inpaint_kwargs["image"] = cropped_face
+            inpaint_kwargs["mask_image"] = cropped_mask
+            inpaint_kwargs["strength"] = inpaint_strength
+            inpaint_kwargs["width"] = cropped_face.width
+            inpaint_kwargs["height"] = cropped_face.height
+
+            if self.is_lora:
+                inpaint_kwargs["cross_attention_kwargs"] = {"scale": inpaint_lora_scale}
+
+            # Run inpainting pipeline
+            if cropped_control:
+                pipe = self.build_controlnet_pipeline(
+                    StableDiffusionXLControlNetInpaintPipeline,
+                    self.controlnet,
+                )
+                controlnet_args = {
+                    "controlnet_conditioning_scale": inpaint_controlnet_conditioning_scale,
+                    "control_guidance_start": inpaint_controlnet_start,
+                    "control_guidance_end": inpaint_controlnet_end,
+                    "control_image": cropped_control,
+                }
+            else:
+                pipe = self.inpaint_pipe
+
+            inpaint_pass = pipe(**common_args, **inpaint_kwargs, **controlnet_args)
+
+            # Paste inpainted face back into original image
+            pasted_image = paste_inpaint_into_original_image(
+                first_pass.images[0],
+                left_top,
+                inpaint_pass.images[0],
+                orig_size,
+            )
+
+            # Save both inpaint result and pasted image to output_paths
+            images_to_add = [
+                inpaint_pass.images[0],
+                pasted_image,
+            ]
+
+            for i, image in enumerate(images_to_add):
+                output_path = f"/tmp/out-final-{i}.png"
+                image.save(output_path)
+                output_paths.append(Path(output_path))
 
         return output_paths

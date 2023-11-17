@@ -286,6 +286,9 @@ def paste_inpaint_into_original_image(
     # Resize mask
     mask = mask.resize(paste_size, Image.Resampling.LANCZOS)
 
+    # Convert mask to fix "bad transparency mask" error
+    mask = mask.convert("L")
+
     # Create a copy of the original image to avoid modifying it directly
     final_image = original_image.copy()
 

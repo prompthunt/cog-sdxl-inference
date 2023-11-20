@@ -581,8 +581,7 @@ class Predictor(BasePredictor):
         compel_proc = Compel(
             tokenizer=pipe.tokenizer,
             text_encoder=pipe.text_encoder,
-            truncate_long_prompts=False,
-            padding_attention_mask_value=
+            truncate_long_prompts=False
         )
 
         common_args = {

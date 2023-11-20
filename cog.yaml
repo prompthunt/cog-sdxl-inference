@@ -35,6 +35,5 @@ build:
     - "mkdir -p ~/.insightface/models/buffalo_l/"
     - "wget https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip"
     - "unzip buffalo_l.zip -d ~/.insightface/models/buffalo_l"
-    - set -eux; mkdir embeddings/ && cd embeddings/ && wget -O FastNegativeV2.pt "https://civitai.com/api/download/models/94057?type=Model&format=PickleTensor" && wget -O BadDream.pt "https://civitai.com/api/download/models/77169?type=Model&format=PickleTensor" && wget -O UnrealisticDream.pt "https://civitai.com/api/download/models/77173?type=Model&format=PickleTensor" && wget -O EasyNegative.pt "https://civitai.com/api/download/models/9536?type=Model&format=PickleTensor&size=full&fp=fp16" && wget -O ng_deepnegative_v1_75t.pt "https://civitai.com/api/download/models/5637?type=Model&format=PickleTensor&size=full&fp=fp16" && wget -O negative_hand-neg.pt "https://civitai.com/api/download/models/60938?type=Negative&format=Other" && wget -O realisticvision-negative-embedding.pt "https://civitai.com/api/download/models/42247?type=Model&format=Other"
 
 predict: "predict.py:Predictor"

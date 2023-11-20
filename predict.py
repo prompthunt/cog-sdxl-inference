@@ -61,13 +61,14 @@ SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
 SAFETY_CACHE = "./safety-cache"
 FEATURE_EXTRACTOR = "./feature-extractor"
+EMBEDDINGS_CACHE = "./embeddings-cache/"
 SDXL_URL = "https://weights.replicate.delivery/default/sdxl/sdxl-vae-upcast-fix.tar"
 REFINER_URL = (
     "https://weights.replicate.delivery/default/sdxl/refiner-no-vae-no-encoder-1.0.tar"
 )
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 
-EMBEDDINGS = [(x.split(".")[0], "/embeddings/" + x) for x in os.listdir("/embeddings/")]
+EMBEDDINGS = [(x.split(".")[0], EMBEDDINGS_CACHE + x) for x in os.listdir(EMBEDDINGS_CACHE)]
 EMBEDDING_TOKENS = [x[0] for x in EMBEDDINGS]
 EMBEDDING_PATHS = [x[1] for x in EMBEDDINGS]
 
@@ -581,6 +582,7 @@ class Predictor(BasePredictor):
             tokenizer=pipe.tokenizer,
             text_encoder=pipe.text_encoder,
             truncate_long_prompts=False,
+            padding_attention_mask_value=
         )
 
         common_args = {

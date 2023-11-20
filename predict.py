@@ -21,12 +21,13 @@ from diffusers import (
     EulerDiscreteScheduler,
     HeunDiscreteScheduler,
     PNDMScheduler,
-    StableDiffusionXLImg2ImgPipeline,
-    StableDiffusionXLInpaintPipeline,
+    StableDiffusionImg2ImgPipeline,
+    StableDiffusionInpaintPipeline,
     ControlNetModel,
-    StableDiffusionXLControlNetPipeline,
-    StableDiffusionXLControlNetImg2ImgPipeline,
-    StableDiffusionXLControlNetInpaintPipeline,
+    StableDiffusionPipeline,
+    StableDiffusionControlNetPipeline,
+    StableDiffusionControlNetImg2ImgPipeline,
+    StableDiffusionControlNetInpaintPipeline,
 )
 from diffusers.models.attention_processor import LoRAAttnProcessor2_0
 from diffusers.pipelines.stable_diffusion.safety_checker import (
@@ -44,7 +45,7 @@ from gfpgan import GFPGANer
 from realesrgan.utils import RealESRGANer
 from basicsr.archs.srvgg_arch import SRVGGNetCompact
 import cv2
-
+from compel import Compel
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
@@ -62,7 +63,6 @@ class KarrasDPM:
         return DPMSolverMultistepScheduler.from_config(
             config,
             use_karras_sigmas=True,
-            euler_at_final=True,
             algorithm_type="sde-dpmsolver++",
         )
 
@@ -202,18 +202,14 @@ class Predictor(BasePredictor):
         self.tuned_model = True
 
     def build_controlnet_pipeline(self, pipeline_class, controlnet):
-        pipe = pipeline_class.from_pretrained(
-            SDXL_MODEL_CACHE,
-            torch_dtype=torch.float16,
-            use_safetensors=True,
-            variant="fp16",
+        pipe = pipeline_class(
             vae=self.txt2img_pipe.vae,
             text_encoder=self.txt2img_pipe.text_encoder,
-            text_encoder_2=self.txt2img_pipe.text_encoder_2,
             tokenizer=self.txt2img_pipe.tokenizer,
-            tokenizer_2=self.txt2img_pipe.tokenizer_2,
             unet=self.txt2img_pipe.unet,
             scheduler=self.txt2img_pipe.scheduler,
+            safety_checker=self.txt2img_pipe.safety_checker,
+            feature_extractor=self.txt2img_pipe.feature_extractor,
             controlnet=controlnet,
         )
 
@@ -272,7 +268,7 @@ class Predictor(BasePredictor):
         self.current_version = "v1.4"
 
         # print("Loading SDXL img2img pipeline...")
-        # self.img2img_pipe = StableDiffusionXLImg2ImgPipeline(
+        # self.img2img_pipe = StableDiffusionImg2ImgPipeline(
         #     vae=self.txt2img_pipe.vae,
         #     text_encoder=self.txt2img_pipe.text_encoder,
         #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
@@ -284,7 +280,7 @@ class Predictor(BasePredictor):
         # self.img2img_pipe.to("cuda")
 
         # print("Loading SDXL inpaint pipeline...")
-        # self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
+        # self.inpaint_pipe = StableDiffusionInpaintPipeline(
         #     vae=self.txt2img_pipe.vae,
         #     text_encoder=self.txt2img_pipe.text_encoder,
         #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
@@ -332,10 +328,69 @@ class Predictor(BasePredictor):
         )
         return image, has_nsfw_concept
 
+    def load_weights(self, url):
+        """Load the model into memory to make running multiple predictions efficient"""
+        print("Loading Safety pipeline...")
+
+        if url == self.url:
+            return
+
+        start_time = time.time()
+        self.download_zip_weights_python(url)
+        print("Downloaded weights in {:.2f} seconds".format(time.time() - start_time))
+
+        start_time = time.time()
+        print("Loading SD pipeline...")
+        self.txt2img_pipe = StableDiffusionPipeline.from_pretrained(
+            "weights",
+            safety_checker=self.safety_checker,
+            feature_extractor=self.feature_extractor,
+            torch_dtype=torch.float16,
+        ).to("cuda")
+
+        print("Loading SD img2img pipeline...")
+        self.img2img_pipe = StableDiffusionImg2ImgPipeline(
+            vae=self.txt2img_pipe.vae,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            tokenizer=self.txt2img_pipe.tokenizer,
+            unet=self.txt2img_pipe.unet,
+            scheduler=self.txt2img_pipe.scheduler,
+            safety_checker=self.txt2img_pipe.safety_checker,
+            feature_extractor=self.txt2img_pipe.feature_extractor,
+        ).to("cuda")
+
+        print("Loading SD inpaint pipeline...")
+        self.inpaint_pipe = StableDiffusionInpaintPipeline(
+            vae=self.txt2img_pipe.vae,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            tokenizer=self.txt2img_pipe.tokenizer,
+            unet=self.txt2img_pipe.unet,
+            scheduler=self.txt2img_pipe.scheduler,
+            safety_checker=self.txt2img_pipe.safety_checker,
+            feature_extractor=self.txt2img_pipe.feature_extractor,
+        ).to("cuda")
+
+        print("Loading controlnet...")
+
+        controlnetModel = "lllyasviel/control_v11p_sd15_openpose"
+
+        self.controlnet = ControlNetModel.from_pretrained(
+            controlnetModel,
+            torch_dtype=torch.float16,
+            cache_dir="diffusers-cache",
+            local_files_only=False,
+        )
+
+        print("Loaded pipelines in {:.2f} seconds".format(time.time() - start_time))
+
+        self.txt2img_pipe.set_progress_bar_config(disable=True)
+        self.img2img_pipe.set_progress_bar_config(disable=True)
+        self.url = url
+
     @torch.inference_mode()
     def predict(
         self,
-        lora_weights: str = Input(
+        weights: str = Input(
             description="LoRA weights to use. Leave blank to use the default weights.",
             default=None,
         ),
@@ -403,16 +458,6 @@ class Predictor(BasePredictor):
         refine_steps: int = Input(
             description="For base_image_refiner, the number of steps to refine, defaults to num_inference_steps",
             default=None,
-        ),
-        apply_watermark: bool = Input(
-            description="Applies a watermark to enable determining if an image is generated in downstream applications. If you have other provisions for generating or deploying images safely, you can use this to disable watermarking.",
-            default=True,
-        ),
-        lora_scale: float = Input(
-            description="LoRA additive scale. Only applicable on trained models.",
-            ge=0.0,
-            le=1.0,
-            default=0.6,
         ),
         disable_safety_checker: bool = Input(
             description="Disable safety checker for generated images. This feature is only available through the API. See [https://replicate.com/docs/how-does-replicate-work#safety](https://replicate.com/docs/how-does-replicate-work#safety)",
@@ -517,72 +562,35 @@ class Predictor(BasePredictor):
             seed = int.from_bytes(os.urandom(2), "big")
         print(f"Using seed: {seed}")
 
-        print("Loading sdxl txt2img pipeline...")
-        self.txt2img_pipe = DiffusionPipeline.from_pretrained(
-            SDXL_MODEL_CACHE,
-            torch_dtype=torch.float16,
-            use_safetensors=True,
-            variant="fp16",
+        weights = weights.replace(
+            "https://replicate.delivery/pbxt/",
+            "https://storage.googleapis.com/replicate-files/",
         )
-        self.txt2img_pipe.to("cuda")
 
-        self.txt2img_pipe.unload_lora_weights()
-
-        if lora_weights:
-            self.load_trained_weights(lora_weights, self.txt2img_pipe)
-
-        print("Loading SDXL img2img pipeline...")
-        self.img2img_pipe = StableDiffusionXLImg2ImgPipeline(
-            vae=self.txt2img_pipe.vae,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            text_encoder_2=self.txt2img_pipe.text_encoder_2,
-            tokenizer=self.txt2img_pipe.tokenizer,
-            tokenizer_2=self.txt2img_pipe.tokenizer_2,
-            unet=self.txt2img_pipe.unet,
-            scheduler=self.txt2img_pipe.scheduler,
-        )
-        self.img2img_pipe.to("cuda")
-
-        print("Loading SDXL inpaint pipeline...")
-        self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
-            vae=self.txt2img_pipe.vae,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            text_encoder_2=self.txt2img_pipe.text_encoder_2,
-            tokenizer=self.txt2img_pipe.tokenizer,
-            tokenizer_2=self.txt2img_pipe.tokenizer_2,
-            unet=self.txt2img_pipe.unet,
-            scheduler=self.txt2img_pipe.scheduler,
-        )
-        self.inpaint_pipe.to("cuda")
-
-        print("Loading controlnet model")
-        self.controlnet = ControlNetModel.from_pretrained(
-            "thibaud/controlnet-openpose-sdxl-1.0",
-            torch_dtype=torch.float16,
-            cache_dir="/src/controlnet-cache",
-        )
-        self.controlnet.to("cuda")
+        if weights is None:
+            raise ValueError("No weights provided")
+        self.load_weights(weights, "1.5")
 
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:
             self.txt2img_pipe.vae.to(dtype=torch.float16)
 
-        sdxl_kwargs = {}
+        kwargs = {}
         if image and mask:
             print("inpainting mode")
-            sdxl_kwargs["image"] = self.load_image(image)
-            sdxl_kwargs["mask_image"] = self.load_image(mask)
-            sdxl_kwargs["strength"] = prompt_strength
-            sdxl_kwargs["width"] = width
-            sdxl_kwargs["height"] = height
+            kwargs["image"] = self.load_image(image)
+            kwargs["mask_image"] = self.load_image(mask)
+            kwargs["strength"] = prompt_strength
+            kwargs["width"] = width
+            kwargs["height"] = height
         elif image:
             print("img2img mode")
-            sdxl_kwargs["image"] = self.load_image(image)
-            sdxl_kwargs["strength"] = prompt_strength
+            kwargs["image"] = self.load_image(image)
+            kwargs["strength"] = prompt_strength
         else:
             print("txt2img mode")
-            sdxl_kwargs["width"] = width
-            sdxl_kwargs["height"] = height
+            kwargs["width"] = width
+            kwargs["height"] = height
 
         controlnet_args = {}
 
@@ -596,26 +604,24 @@ class Predictor(BasePredictor):
             if image and mask:
                 controlnet_args["control_image"] = pose_image
                 pipe = self.build_controlnet_pipeline(
-                    StableDiffusionXLControlNetInpaintPipeline,
+                    StableDiffusionControlNetInpaintPipeline,
                     self.controlnet,
                 )
             elif image:
                 controlnet_args["control_image"] = pose_image
                 pipe = self.build_controlnet_pipeline(
-                    StableDiffusionXLControlNetImg2ImgPipeline,
+                    StableDiffusionControlNetImg2ImgPipeline,
                     self.controlnet,
                 )
             else:
                 controlnet_args["image"] = pose_image
                 pipe = self.build_controlnet_pipeline(
-                    StableDiffusionXLControlNetPipeline,
+                    StableDiffusionControlNetPipeline,
                     self.controlnet,
                 )
 
         else:
-            if image and mask:
-                pipe = self.inpaint_pipe
-            elif image:
+            if image:
                 pipe = self.img2img_pipe
             else:
                 pipe = self.txt2img_pipe
@@ -626,37 +632,24 @@ class Predictor(BasePredictor):
                 prompt = prompt.replace(k, v)
         print(f"Prompt: {prompt}")
 
-        if refine == "expert_ensemble_refiner":
-            sdxl_kwargs["output_type"] = "latent"
-            sdxl_kwargs["denoising_end"] = high_noise_frac
-        elif refine == "base_image_refiner":
-            sdxl_kwargs["output_type"] = "latent"
-
-        if not apply_watermark:
-            # toggles watermark for this prediction
-            watermark_cache = pipe.watermark
-            pipe.watermark = None
-            self.refiner.watermark = None
-
         pipe.scheduler = SCHEDULERS[scheduler].from_config(pipe.scheduler.config)
         generator = torch.Generator("cuda").manual_seed(seed)
 
+        compel_proc = Compel(
+            tokenizer=pipe.tokenizer,
+            text_encoder=pipe.text_encoder,
+            truncate_long_prompts=False,
+        )
+
         common_args = {
-            "prompt": [prompt] * num_outputs,
-            "negative_prompt": [negative_prompt] * num_outputs,
+            "prompt_embeds": compel_proc(prompt),
+            "negative_prompt_embeds": compel_proc(negative_prompt),
             "guidance_scale": guidance_scale,
             "generator": generator,
             "num_inference_steps": num_inference_steps,
         }
 
-        if self.is_lora:
-            sdxl_kwargs["cross_attention_kwargs"] = {"scale": lora_scale}
-
-        first_pass = pipe(**common_args, **sdxl_kwargs, **controlnet_args)
-
-        if not apply_watermark:
-            pipe.watermark = watermark_cache
-            self.refiner.watermark = watermark_cache
+        first_pass = pipe(**common_args, **kwargs, **controlnet_args)
 
         output_paths = []
         for i, image in enumerate(first_pass.images):
@@ -741,7 +734,7 @@ class Predictor(BasePredictor):
             # Run inpainting pipeline
             if cropped_control:
                 pipe = self.build_controlnet_pipeline(
-                    StableDiffusionXLControlNetInpaintPipeline,
+                    StableDiffusionControlNetInpaintPipeline,
                     self.controlnet,
                 )
                 controlnet_args = {

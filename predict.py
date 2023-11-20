@@ -222,7 +222,7 @@ class Predictor(BasePredictor):
         """Load the model into memory to make running multiple predictions efficient"""
 
         self.feature_extractor = CLIPFeatureExtractor.from_pretrained(
-            "openai/clip-vit-base-patch32", cache_dir=SAFETY_MODEL_CACHE
+            "openai/clip-vit-base-patch32"
         )
         self.url = None
 

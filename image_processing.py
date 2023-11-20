@@ -226,7 +226,7 @@ def crop_faces_to_square(
     mask_image: Image.Image,
     control_image: Optional[Image.Image] = None,
     padding: Optional[float] = 0.5,
-    resize_to: Optional[int] = 768,
+    resize_to: Optional[int] = 512,
 ) -> Tuple[
     Image.Image, Image.Image, Optional[Image.Image], Tuple[int, int], Tuple[int, int]
 ]:

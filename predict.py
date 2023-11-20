@@ -270,7 +270,7 @@ class Predictor(BasePredictor):
         ),
         prompt: str = Input(
             description="Input prompt",
-            default="An astronaut riding a rainbow unicorn",
+            default="An photo of cjw man",
         ),
         negative_prompt: str = Input(
             description="Input Negative Prompt",
@@ -286,11 +286,11 @@ class Predictor(BasePredictor):
         ),
         width: int = Input(
             description="Width of output image",
-            default=1024,
+            default=512,
         ),
         height: int = Input(
             description="Height of output image",
-            default=1024,
+            default=512,
         ),
         num_outputs: int = Input(
             description="Number of images to output.",
@@ -372,7 +372,7 @@ class Predictor(BasePredictor):
         ),
         face_resize_to: int = Input(
             description="Resize the face bounding box to this size (in pixels).",
-            default=1024,
+            default=512,
         ),
         upscale_face: bool = Input(
             description="Upscale the face using GFPGAN",
@@ -388,7 +388,7 @@ class Predictor(BasePredictor):
         # inpaint_controlnet_end
         inpaint_prompt: str = Input(
             description="Input prompt",
-            default="A photo of TOK",
+            default="A photo of cjw man",
         ),
         inpaint_negative_prompt: str = Input(
             description="Input Negative Prompt",

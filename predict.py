@@ -270,6 +270,22 @@ class Predictor(BasePredictor):
         shutil.copyfile(path, "/tmp/image.png")
         return load_image("/tmp/image.png").convert("RGB")
 
+    def download_zip_weights_python(self, url):
+        """Download the model weights from the given URL"""
+        print("Downloading weights...")
+
+        if os.path.exists("weights"):
+            shutil.rmtree("weights")
+        os.makedirs("weights")
+
+        import zipfile
+        from io import BytesIO
+        import urllib.request
+
+        url = urllib.request.urlopen(url)
+        with zipfile.ZipFile(BytesIO(url.read())) as zf:
+            zf.extractall("weights")
+
     def load_weights(self, url):
         """Load the model into memory to make running multiple predictions efficient"""
         print("Loading Safety pipeline...")

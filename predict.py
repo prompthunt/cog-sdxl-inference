@@ -46,6 +46,7 @@ from realesrgan.utils import RealESRGANer
 from basicsr.archs.srvgg_arch import SRVGGNetCompact
 import cv2
 from compel import Compel
+from transformers import CLIPFeatureExtractor
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
@@ -220,12 +221,10 @@ class Predictor(BasePredictor):
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
 
-        self.weights_cache = WeightsDownloadCache()
-
-        self.feature_extractor = CLIPImageProcessor.from_pretrained(FEATURE_EXTRACTOR)
-
-        if not os.path.exists(SDXL_MODEL_CACHE):
-            download_weights(SDXL_URL, SDXL_MODEL_CACHE)
+        self.feature_extractor = CLIPFeatureExtractor.from_pretrained(
+            "openai/clip-vit-base-patch32", cache_dir=SAFETY_MODEL_CACHE
+        )
+        self.url = None
 
         if not os.path.exists("gfpgan/weights/realesr-general-x4v3.pth"):
             os.system(
@@ -267,66 +266,9 @@ class Predictor(BasePredictor):
         )
         self.current_version = "v1.4"
 
-        # print("Loading SDXL img2img pipeline...")
-        # self.img2img_pipe = StableDiffusionImg2ImgPipeline(
-        #     vae=self.txt2img_pipe.vae,
-        #     text_encoder=self.txt2img_pipe.text_encoder,
-        #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
-        #     tokenizer=self.txt2img_pipe.tokenizer,
-        #     tokenizer_2=self.txt2img_pipe.tokenizer_2,
-        #     unet=self.txt2img_pipe.unet,
-        #     scheduler=self.txt2img_pipe.scheduler,
-        # )
-        # self.img2img_pipe.to("cuda")
-
-        # print("Loading SDXL inpaint pipeline...")
-        # self.inpaint_pipe = StableDiffusionInpaintPipeline(
-        #     vae=self.txt2img_pipe.vae,
-        #     text_encoder=self.txt2img_pipe.text_encoder,
-        #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
-        #     tokenizer=self.txt2img_pipe.tokenizer,
-        #     tokenizer_2=self.txt2img_pipe.tokenizer_2,
-        #     unet=self.txt2img_pipe.unet,
-        #     scheduler=self.txt2img_pipe.scheduler,
-        # )
-        # self.inpaint_pipe.to("cuda")
-
-        # print("Loading SDXL refiner pipeline...")
-        # # FIXME(ja): should the vae/text_encoder_2 be loaded from SDXL always?
-        # #            - in the case of fine-tuned SDXL should we still?
-        # # FIXME(ja): if the answer to above is use VAE/Text_Encoder_2 from fine-tune
-        # #            what does this imply about lora + refiner? does the refiner need to know about
-
-        # if not os.path.exists(REFINER_MODEL_CACHE):
-        #     download_weights(REFINER_URL, REFINER_MODEL_CACHE)
-
-        # print("Loading refiner pipeline...")
-        # self.refiner = DiffusionPipeline.from_pretrained(
-        #     REFINER_MODEL_CACHE,
-        #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
-        #     vae=self.txt2img_pipe.vae,
-        #     torch_dtype=torch.float16,
-        #     use_safetensors=True,
-        #     variant="fp16",
-        # )
-        # self.refiner.to("cuda")
-        # print("setup took: ", time.time() - start)
-        # self.txt2img_pipe.__class__.encode_prompt = new_encode_prompt
-
     def load_image(self, path):
         shutil.copyfile(path, "/tmp/image.png")
         return load_image("/tmp/image.png").convert("RGB")
-
-    def run_safety_checker(self, image):
-        safety_checker_input = self.feature_extractor(image, return_tensors="pt").to(
-            "cuda"
-        )
-        np_image = [np.array(val) for val in image]
-        image, has_nsfw_concept = self.safety_checker(
-            images=np_image,
-            clip_input=safety_checker_input.pixel_values.to(torch.float16),
-        )
-        return image, has_nsfw_concept
 
     def load_weights(self, url):
         """Load the model into memory to make running multiple predictions efficient"""
@@ -569,7 +511,7 @@ class Predictor(BasePredictor):
 
         if weights is None:
             raise ValueError("No weights provided")
-        self.load_weights(weights, "1.5")
+        self.load_weights(weights)
 
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:

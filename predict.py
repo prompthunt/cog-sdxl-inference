@@ -223,11 +223,19 @@ class Predictor(BasePredictor):
             result = self.face_swapper.get(
                 frame, target_face, source_face, paste_back=True
             )
+            out_path = "result-1.jpg"
+            cv2.imwrite(str(out_path), result)
             _, _, result = self.face_enhancer.enhance(result, paste_back=True)
-
+            out_path = "result-2.jpg"
+            cv2.imwrite(str(out_path), result)
+            data = {
+                "code": 200,
+                "msg": "succeed",
+                "image": out_path,
+                "status": "succeed",
+            }
             # Return PIL image
             return Image.fromarray(result)
-
         except Exception as e:
             print("FACESWAP ERROR", str(e))
 
@@ -597,7 +605,7 @@ class Predictor(BasePredictor):
                     swapped_image.save(output_path)
                     output_paths.append(Path(output_path))
                     swapped_images.append(swapped_image)
-                
+
                 first_pass_done_images = swapped_images
             else:
                 print("No source image provided, skipping face swap")

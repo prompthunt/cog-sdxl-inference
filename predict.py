@@ -550,7 +550,6 @@ class Predictor(BasePredictor):
                     StableDiffusionControlNetPipeline,
                     self.controlnet,
                 )
-
         else:
             if image:
                 pipe = self.img2img_pipe
@@ -586,6 +585,8 @@ class Predictor(BasePredictor):
 
         swapped_images = []
 
+        first_pass_done_images = first_pass.images
+
         # face swap
         if should_swap_face:
             if source_image:
@@ -596,15 +597,14 @@ class Predictor(BasePredictor):
                     swapped_image.save(output_path)
                     output_paths.append(Path(output_path))
                     swapped_images.append(swapped_image)
+                
+                first_pass_done_images = swapped_images
             else:
                 print("No source image provided, skipping face swap")
 
-        # First pass done images are swapped if swapped else original images
-        first_pass_done_images = (
-            first_pass.images if not should_swap_face else swapped_images
+        face_masks = face_mask_google_mediapipe(
+            first_pass_done_images, mask_blur_amount, 0
         )
-
-        face_masks = face_mask_google_mediapipe(first_pass_done_images, mask_blur_amount, 0)
 
         # Based on face detection, crop base image, mask image and pose image (if available)
         # to the face and save them to output_paths

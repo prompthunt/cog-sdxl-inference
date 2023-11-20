@@ -31,7 +31,7 @@ build:
     - wget http://thegiflibrary.tumblr.com/post/11565547760 -O face_landmarker_v2_with_blendshapes.task -q https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
     - pip install git+https://github.com/wiktorlazarski/head-segmentation.git
     - pip install compel==1.0.4
-    - 'mkdir /src/cache -p && cd /src/cache && wget https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth && wget https://huggingface.co/ashleykleynhans/inswapper/resolve/main/inswapper_128.onnx'
+    - "mkdir /src/cache -p && cd /src/cache && wget https://chroma-ckpt.s3.amazonaws.com/inswapper_128.onnx"
     - "mkdir -p ~/.insightface/models/buffalo_l/"
     - "wget https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip"
     - "unzip buffalo_l.zip -d ~/.insightface/models/buffalo_l"

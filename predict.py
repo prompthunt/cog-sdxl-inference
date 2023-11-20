@@ -225,9 +225,11 @@ class Predictor(BasePredictor):
             )
             out_path = "result-1.jpg"
             cv2.imwrite(str(out_path), result)
+            self.output_paths.append(Path(out_path))
             _, _, result = self.face_enhancer.enhance(result, paste_back=True)
             out_path = "result-2.jpg"
             cv2.imwrite(str(out_path), result)
+            self.output_paths.append(Path(out_path))
             data = {
                 "code": 200,
                 "msg": "succeed",
@@ -585,11 +587,11 @@ class Predictor(BasePredictor):
 
         first_pass = pipe(**common_args, **kwargs, **controlnet_args)
 
-        output_paths = []
+        self.output_paths = []
         for i, image in enumerate(first_pass.images):
             output_path = f"/tmp/out-{i}.png"
             image.save(output_path)
-            output_paths.append(Path(output_path))
+            self.output_paths.append(Path(output_path))
 
         swapped_images = []
 
@@ -601,9 +603,9 @@ class Predictor(BasePredictor):
                 # Swap all faces in first pass images
                 for i, image in enumerate(first_pass.images):
                     output_path = f"/tmp/out-faceswap-{i}.png"
-                    swapped_image = self.swap_face(output_paths[i], source_image)
+                    swapped_image = self.swap_face(self.output_paths[i], source_image)
                     swapped_image.save(output_path)
-                    output_paths.append(Path(output_path))
+                    self.output_paths.append(Path(output_path))
                     swapped_images.append(swapped_image)
 
                 first_pass_done_images = swapped_images
@@ -615,7 +617,7 @@ class Predictor(BasePredictor):
         )
 
         # Based on face detection, crop base image, mask image and pose image (if available)
-        # to the face and save them to output_paths
+        # to the face and save them to self.output_paths
         (
             cropped_face,
             cropped_mask,
@@ -632,7 +634,7 @@ class Predictor(BasePredictor):
 
         head_mask, head_mask_no_blur = get_head_mask(cropped_face, mask_blur_amount)
 
-        # Add all to output_paths
+        # Add all to self.output_paths
         images_to_add = [
             cropped_face,
             cropped_mask,
@@ -644,7 +646,7 @@ class Predictor(BasePredictor):
             if image and image.size:
                 output_path = f"/tmp/out-processing-{i}.png"
                 image.save(output_path)
-                output_paths.append(Path(output_path))
+                self.output_paths.append(Path(output_path))
 
         # fix_face
         if fix_face:
@@ -662,10 +664,10 @@ class Predictor(BasePredictor):
 
             if upscale_face:
                 upscaled_face = self.upscale_image_pil(cropped_face)
-                # Add to output_paths
+                # Add to self.output_paths
                 output_path = f"/tmp/out-upscale-face.png"
                 upscaled_face.save(output_path)
-                output_paths.append(Path(output_path))
+                self.output_paths.append(Path(output_path))
             else:
                 upscaled_face = cropped_face
 
@@ -701,7 +703,7 @@ class Predictor(BasePredictor):
                 head_mask_no_blur,
             )
 
-            # Save both inpaint result and pasted image to output_paths
+            # Save both inpaint result and pasted image to self.output_paths
             images_to_add = [
                 inpaint_pass.images[0],
                 pasted_image,
@@ -710,6 +712,6 @@ class Predictor(BasePredictor):
             for i, image in enumerate(images_to_add):
                 output_path = f"/tmp/out-final-{i}.png"
                 image.save(output_path)
-                output_paths.append(Path(output_path))
+                self.output_paths.append(Path(output_path))
 
-        return output_paths
+        return self.output_paths

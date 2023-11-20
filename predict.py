@@ -223,21 +223,8 @@ class Predictor(BasePredictor):
             result = self.face_swapper.get(
                 frame, target_face, source_face, paste_back=True
             )
-            out_path = "result-1.jpg"
-            cv2.imwrite(str(out_path), result)
-            self.output_paths.append(Path(out_path))
             _, _, result = self.face_enhancer.enhance(result, paste_back=True)
-            out_path = "result-2.jpg"
-            cv2.imwrite(str(out_path), result)
-            self.output_paths.append(Path(out_path))
-            data = {
-                "code": 200,
-                "msg": "succeed",
-                "image": out_path,
-                "status": "succeed",
-            }
-            # Return PIL image
-            # Assuming 'result' is your OpenCV image
+
             # Convert from BGR to RGB
             result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
 

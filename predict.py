@@ -301,7 +301,7 @@ class Predictor(BasePredictor):
         print("Loading SD pipeline...")
         self.txt2img_pipe = StableDiffusionPipeline.from_pretrained(
             "weights",
-            safety_checker=self.safety_checker,
+            safety_checker=None,
             feature_extractor=self.feature_extractor,
             torch_dtype=torch.float16,
         ).to("cuda")

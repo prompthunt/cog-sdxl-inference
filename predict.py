@@ -47,6 +47,15 @@ from basicsr.archs.srvgg_arch import SRVGGNetCompact
 import cv2
 from compel import Compel
 from transformers import CLIPFeatureExtractor
+import insightface
+import onnxruntime
+from insightface.app import FaceAnalysis
+from image_processing import (
+    face_mask_google_mediapipe,
+    crop_faces_to_square,
+    paste_inpaint_into_original_image,
+    get_head_mask,
+)
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
@@ -176,11 +185,51 @@ class Predictor(BasePredictor):
         self.face_enhancer = GFPGANer(
             model_path="gfpgan/weights/GFPGANv1.4.pth",
             upscale=1,
-            arch="clean",
-            channel_multiplier=2,
-            bg_upsampler=self.upsampler,
         )
         self.current_version = "v1.4"
+
+        self.face_swapper = insightface.model_zoo.get_model(
+            "cache/inswapper_128.onnx", providers=onnxruntime.get_available_providers()
+        )
+        self.face_analyser = FaceAnalysis(name="buffalo_l")
+        self.face_analyser.prepare(ctx_id=0, det_thresh=0.5, det_size=(640, 640))
+
+    def get_face(self, img_data, image_type="target"):
+        try:
+            analysed = self.face_analyser.get(img_data)
+            print(f"face num: {len(analysed)}")
+            if len(analysed) == 0 and image_type == "source":
+                msg = "no face"
+                print(msg)
+                raise Exception(msg)
+            largest = max(
+                analysed,
+                key=lambda x: (x.bbox[2] - x.bbox[0]) * (x.bbox[3] - x.bbox[1]),
+            )
+            return largest
+        except Exception as e:
+            print(str(e))
+            raise Exception(str(e))
+
+    # Target image is image to paste into
+    # Source image is image to take face from
+    def swap_face(self, target_image: Path, source_image: Path) -> Image.Image:
+        try:
+            frame = cv2.imread(str(target_image))
+            target_face = self.get_face(frame)
+            source_face = self.get_face(
+                cv2.imread(str(source_image)), image_type="source"
+            )
+            result = self.face_swapper.get(
+                frame, target_face, source_face, paste_back=True
+            )
+            _, _, result = self.face_enhancer.enhance(result, paste_back=True)
+
+            # Return PIL image
+            return Image.fromarray(result)
+
+        except Exception as e:
+            print("FACESWAP ERROR", str(e))
 
     def load_image(self, path):
         shutil.copyfile(path, "/tmp/image.png")
@@ -317,6 +366,14 @@ class Predictor(BasePredictor):
         ),
         seed: int = Input(
             description="Random seed. Leave blank to randomize the seed", default=None
+        ),
+        should_swap_face: bool = Input(
+            description="Should swap face",
+            default=False,
+        ),
+        source_image: Path = Input(
+            description="Source image for face swap",
+            default=None,
         ),
         refine: str = Input(
             description="Which refine style to use",
@@ -527,51 +584,63 @@ class Predictor(BasePredictor):
             image.save(output_path)
             output_paths.append(Path(output_path))
 
+        swapped_images = []
+
+        # face swap
+        if should_swap_face:
+            if source_image:
+                # Swap all faces in first pass images
+                for i, image in enumerate(first_pass.images):
+                    output_path = f"/tmp/out-faceswap-{i}.png"
+                    swapped_image = self.swap_face(output_paths[i], source_image)
+                    swapped_image.save(output_path)
+                    output_paths.append(Path(output_path))
+                    swapped_images.append(swapped_image)
+            else:
+                print("No source image provided, skipping face swap")
+
+        # First pass done images are swapped if swapped else original images
+        first_pass_done_images = (
+            first_pass.images if not should_swap_face else swapped_images
+        )
+
+        face_masks = face_mask_google_mediapipe(first_pass_done_images, mask_blur_amount, 0)
+
+        # Based on face detection, crop base image, mask image and pose image (if available)
+        # to the face and save them to output_paths
+        (
+            cropped_face,
+            cropped_mask,
+            cropped_control,
+            left_top,
+            orig_size,
+        ) = crop_faces_to_square(
+            first_pass_done_images[0],
+            face_masks[0],
+            pose_image,
+            face_padding,
+            face_resize_to,
+        )
+
+        head_mask, head_mask_no_blur = get_head_mask(cropped_face, mask_blur_amount)
+
+        # Add all to output_paths
+        images_to_add = [
+            cropped_face,
+            cropped_mask,
+            cropped_control,
+            head_mask,
+        ]
+        for i, image in enumerate(images_to_add):
+            # If image is image and exists
+            if image and image.size:
+                output_path = f"/tmp/out-processing-{i}.png"
+                image.save(output_path)
+                output_paths.append(Path(output_path))
+
         # fix_face
         if fix_face:
-            from image_processing import (
-                face_mask_google_mediapipe,
-                crop_faces_to_square,
-                paste_inpaint_into_original_image,
-                get_head_mask,
-            )
-
-            face_masks = face_mask_google_mediapipe(
-                first_pass.images, mask_blur_amount, 0
-            )
-
-            # Based on face detection, crop base image, mask image and pose image (if available)
-            # to the face and save them to output_paths
-            (
-                cropped_face,
-                cropped_mask,
-                cropped_control,
-                left_top,
-                orig_size,
-            ) = crop_faces_to_square(
-                first_pass.images[0],
-                face_masks[0],
-                pose_image,
-                face_padding,
-                face_resize_to,
-            )
-
-            head_mask, head_mask_no_blur = get_head_mask(cropped_face, mask_blur_amount)
-
-            # Add all to output_paths
-            images_to_add = [
-                cropped_face,
-                cropped_mask,
-                cropped_control,
-                head_mask,
-            ]
-            for i, image in enumerate(images_to_add):
-                # If image is image and exists
-                if image and image.size:
-                    output_path = f"/tmp/out-processing-{i}.png"
-                    image.save(output_path)
-                    output_paths.append(Path(output_path))
-
+            # Run inpainting pipeline
             inpaint_generator = torch.Generator("cuda").manual_seed(seed)
             common_args = {
                 "prompt": [inpaint_prompt] * num_outputs,
@@ -617,7 +686,7 @@ class Predictor(BasePredictor):
 
             # Paste inpainted face back into original image
             pasted_image = paste_inpaint_into_original_image(
-                first_pass.images[0],
+                first_pass_done_images[0],
                 left_top,
                 inpaint_pass.images[0],
                 orig_size,

@@ -598,9 +598,6 @@ class Predictor(BasePredictor):
             inpaint_kwargs["width"] = cropped_face.width
             inpaint_kwargs["height"] = cropped_face.height
 
-            if self.is_lora:
-                inpaint_kwargs["cross_attention_kwargs"] = {"scale": inpaint_lora_scale}
-
             # Run inpainting pipeline
             if cropped_control:
                 pipe = self.build_controlnet_pipeline(

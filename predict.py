@@ -237,7 +237,13 @@ class Predictor(BasePredictor):
                 "status": "succeed",
             }
             # Return PIL image
-            return Image.fromarray(result)
+            # Assuming 'result' is your OpenCV image
+            # Convert from BGR to RGB
+            result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+
+            # Convert to PIL Image
+            pil_image = Image.fromarray(result_rgb)
+            return pil_image
         except Exception as e:
             print("FACESWAP ERROR", str(e))
 

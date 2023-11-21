@@ -368,7 +368,7 @@ class Predictor(BasePredictor):
         num_outputs: int = Input(
             description="Number of images to output.",
             ge=1,
-            le=4,
+            le=40,
             default=1,
         ),
         scheduler: str = Input(
@@ -521,10 +521,6 @@ class Predictor(BasePredictor):
         ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
-        if seed is None:
-            seed = int.from_bytes(os.urandom(2), "big")
-        print(f"Using seed: {seed}")
-
         weights = weights.replace(
             "https://replicate.delivery/pbxt/",
             "https://storage.googleapis.com/replicate-files/",
@@ -538,228 +534,240 @@ class Predictor(BasePredictor):
         if self.txt2img_pipe.vae.dtype == torch.float32:
             self.txt2img_pipe.vae.to(dtype=torch.float16)
 
-        kwargs = {}
-        if image and mask:
-            print("inpainting mode")
-            kwargs["image"] = self.load_image(image)
-            kwargs["mask_image"] = self.load_image(mask)
-            kwargs["strength"] = prompt_strength
-            kwargs["width"] = width
-            kwargs["height"] = height
-        elif image:
-            print("img2img mode")
-            kwargs["image"] = self.load_image(image)
-            kwargs["strength"] = prompt_strength
-        else:
-            print("txt2img mode")
-            kwargs["width"] = width
-            kwargs["height"] = height
+        # For loop num_outputs for whole pipeline
+        for o in range(num_outputs):
+            if seed is None:
+                seed = int.from_bytes(os.urandom(2), "big")
+            else:
+                seed += o
+            print(f"Using seed: {seed}")
 
-        controlnet_args = {}
-
-        if pose_image:
-            controlnet_args = {
-                "controlnet_conditioning_scale": controlnet_conditioning_scale,
-                "control_guidance_start": controlnet_start,
-                "control_guidance_end": controlnet_end,
-            }
-            pose_image = self.load_image(pose_image)
+            kwargs = {}
             if image and mask:
-                controlnet_args["control_image"] = pose_image
-                pipe = self.build_controlnet_pipeline(
-                    StableDiffusionControlNetInpaintPipeline,
-                    self.controlnet,
-                )
+                print("inpainting mode")
+                kwargs["image"] = self.load_image(image)
+                kwargs["mask_image"] = self.load_image(mask)
+                kwargs["strength"] = prompt_strength
+                kwargs["width"] = width
+                kwargs["height"] = height
             elif image:
-                controlnet_args["control_image"] = pose_image
-                pipe = self.build_controlnet_pipeline(
-                    StableDiffusionControlNetImg2ImgPipeline,
-                    self.controlnet,
-                )
+                print("img2img mode")
+                kwargs["image"] = self.load_image(image)
+                kwargs["strength"] = prompt_strength
             else:
-                controlnet_args["image"] = pose_image
-                pipe = self.build_controlnet_pipeline(
-                    StableDiffusionControlNetPipeline,
-                    self.controlnet,
-                )
-        else:
-            if image:
-                pipe = self.img2img_pipe
+                print("txt2img mode")
+                kwargs["width"] = width
+                kwargs["height"] = height
+
+            controlnet_args = {}
+
+            if pose_image:
+                controlnet_args = {
+                    "controlnet_conditioning_scale": controlnet_conditioning_scale,
+                    "control_guidance_start": controlnet_start,
+                    "control_guidance_end": controlnet_end,
+                }
+                pose_image = self.load_image(pose_image)
+                if image and mask:
+                    controlnet_args["control_image"] = pose_image
+                    pipe = self.build_controlnet_pipeline(
+                        StableDiffusionControlNetInpaintPipeline,
+                        self.controlnet,
+                    )
+                elif image:
+                    controlnet_args["control_image"] = pose_image
+                    pipe = self.build_controlnet_pipeline(
+                        StableDiffusionControlNetImg2ImgPipeline,
+                        self.controlnet,
+                    )
+                else:
+                    controlnet_args["image"] = pose_image
+                    pipe = self.build_controlnet_pipeline(
+                        StableDiffusionControlNetPipeline,
+                        self.controlnet,
+                    )
             else:
-                pipe = self.txt2img_pipe
+                if image:
+                    pipe = self.img2img_pipe
+                else:
+                    pipe = self.txt2img_pipe
 
-        print(f"Prompt: {prompt}")
+            print(f"Prompt: {prompt}")
 
-        pipe.scheduler = SCHEDULERS[scheduler].from_config(pipe.scheduler.config)
-        generator = torch.Generator("cuda").manual_seed(seed)
+            pipe.scheduler = SCHEDULERS[scheduler].from_config(pipe.scheduler.config)
+            generator = torch.Generator("cuda").manual_seed(seed)
 
-        prompt = root_prompt + ", " + prompt
-        negative_prompt = root_negative_prompt + ", " + negative_prompt
+            prompt = root_prompt + ", " + prompt
+            negative_prompt = root_negative_prompt + ", " + negative_prompt
 
-        prompt_embeds, negative_prompt_embeds = get_weighted_text_embeddings(
-            pipe, prompt, negative_prompt
-        )
-
-        common_args = {
-            "prompt_embeds": prompt_embeds,
-            "negative_prompt_embeds": negative_prompt_embeds,
-            "guidance_scale": guidance_scale,
-            "generator": generator,
-            "num_inference_steps": num_inference_steps,
-        }
-
-        first_pass = pipe(**common_args, **kwargs, **controlnet_args)
-
-        self.output_paths = []
-        for i, image in enumerate(first_pass.images):
-            output_path = f"/tmp/out-{i}.png"
-            image.save(output_path)
-            self.output_paths.append(Path(output_path))
-
-        swapped_images = []
-
-        first_pass_done_images = first_pass.images
-
-        # face swap
-        if should_swap_face:
-            if source_image:
-                # Swap all faces in first pass images
-                for i, image in enumerate(first_pass.images):
-                    output_path = f"/tmp/out-faceswap-{i}.png"
-                    swapped_image = self.swap_face(self.output_paths[i], source_image)
-                    swapped_image.save(output_path)
-                    self.output_paths.append(Path(output_path))
-                    swapped_images.append(swapped_image)
-
-                first_pass_done_images = swapped_images
-            else:
-                print("No source image provided, skipping face swap")
-
-        # inpaint_face
-        if inpaint_face:
-            face_masks = face_mask_google_mediapipe(
-                first_pass_done_images, mask_blur_amount, 0
+            prompt_embeds, negative_prompt_embeds = get_weighted_text_embeddings(
+                pipe, prompt, negative_prompt
             )
-
-            # Based on face detection, crop base image, mask image and pose image (if available)
-            # to the face and save them to self.output_paths
-            (
-                cropped_face,
-                cropped_mask,
-                cropped_control,
-                left_top,
-                orig_size,
-            ) = crop_faces_to_square(
-                first_pass_done_images[0],
-                face_masks[0],
-                pose_image,
-                face_padding,
-                face_resize_to,
-            )
-
-            head_mask, head_mask_no_blur = get_head_mask(cropped_face, mask_blur_amount)
-
-            if show_debug_images:
-                # Add all to self.output_paths
-                images_to_add = [
-                    cropped_face,
-                    cropped_mask,
-                    cropped_control,
-                    head_mask,
-                ]
-                for i, image in enumerate(images_to_add):
-                    # If image is image and exists
-                    if image and image.size:
-                        output_path = f"/tmp/out-processing-{i}.png"
-                        image.save(output_path)
-                        self.output_paths.append(Path(output_path))
-
-            inpaint_seed = int.from_bytes(os.urandom(2), "big")
-            # Run inpainting pipeline
-            inpaint_generator = torch.Generator("cuda").manual_seed(inpaint_seed)
 
             common_args = {
-                "guidance_scale": inpaint_guidance_scale,
-                "generator": inpaint_generator,
-                "num_inference_steps": inpaint_num_inference_steps,
+                "prompt_embeds": prompt_embeds,
+                "negative_prompt_embeds": negative_prompt_embeds,
+                "guidance_scale": guidance_scale,
+                "generator": generator,
+                "num_inference_steps": num_inference_steps,
             }
 
-            inpaint_kwargs = {}
+            first_pass = pipe(**common_args, **kwargs, **controlnet_args)
 
-            if upscale_face:
-                upscaled_face = self.upscale_image_pil(cropped_face)
-                if show_debug_images:
-                    # Add to self.output_paths
-                    output_path = f"/tmp/out-upscale-face.png"
-                    upscaled_face.save(output_path)
-                    self.output_paths.append(Path(output_path))
-            else:
-                upscaled_face = cropped_face
-
-            inpaint_kwargs["image"] = upscaled_face
-            inpaint_kwargs["mask_image"] = head_mask
-            inpaint_kwargs["strength"] = inpaint_strength
-            inpaint_kwargs["width"] = cropped_face.width
-            inpaint_kwargs["height"] = cropped_face.height
-
-            # Run inpainting pipeline
-            if cropped_control:
-                pipe = self.build_controlnet_pipeline(
-                    StableDiffusionControlNetInpaintPipeline,
-                    self.controlnet,
-                )
-                controlnet_args = {
-                    "controlnet_conditioning_scale": inpaint_controlnet_conditioning_scale,
-                    "control_guidance_start": inpaint_controlnet_start,
-                    "control_guidance_end": inpaint_controlnet_end,
-                    "control_image": cropped_control,
-                }
-            else:
-                pipe = self.inpaint_pipe
-
-            inpaint_prompt = inpaint_prompt + ", " + root_prompt
-            inpaint_negative_prompt = (
-                inpaint_negative_prompt + ", " + root_negative_prompt
-            )
-
-            (
-                inpaint_prompt_embeds,
-                inpaint_negative_prompt_embeds,
-            ) = get_weighted_text_embeddings(
-                pipe, inpaint_prompt, inpaint_negative_prompt
-            )
-
-            common_args["prompt_embeds"] = inpaint_prompt_embeds
-            common_args["negative_prompt_embeds"] = inpaint_negative_prompt_embeds
-
-            inpaint_pass = pipe(**common_args, **inpaint_kwargs, **controlnet_args)
-
-            # Paste inpainted face back into original image
-            pasted_image = paste_inpaint_into_original_image(
-                first_pass_done_images[0],
-                left_top,
-                inpaint_pass.images[0],
-                orig_size,
-                head_mask_no_blur,
-            )
-
-            # Save both inpaint result and pasted image to self.output_paths
-            images_to_add = [
-                inpaint_pass.images[0],
-                pasted_image,
-            ]
-
-            for i, image in enumerate(images_to_add):
-                output_path = f"/tmp/out-final-{i}.png"
+            self.output_paths = []
+            for i, image in enumerate(first_pass.images):
+                output_path = f"/tmp/out-{o}-{i}.png"
                 image.save(output_path)
                 self.output_paths.append(Path(output_path))
 
-        if upscale_final_image:
-            last_output_image_pil = Image.open(self.output_paths[-1])
-            upscaled_image = self.upscale_image_pil(last_output_image_pil)
-            # Add to self.output_paths
-            output_path = f"/tmp/out-upscale-final.png"
-            upscaled_image.save(output_path)
-            self.output_paths.append(Path(output_path))
+            swapped_images = []
+
+            first_pass_done_images = first_pass.images
+
+            # face swap
+            if should_swap_face:
+                if source_image:
+                    # Swap all faces in first pass images
+                    for i, image in enumerate(first_pass.images):
+                        output_path = f"/tmp/out-faceswap-{o}-{i}.png"
+                        swapped_image = self.swap_face(
+                            self.output_paths[i], source_image
+                        )
+                        swapped_image.save(output_path)
+                        self.output_paths.append(Path(output_path))
+                        swapped_images.append(swapped_image)
+
+                    first_pass_done_images = swapped_images
+                else:
+                    print("No source image provided, skipping face swap")
+
+            # inpaint_face
+            if inpaint_face:
+                face_masks = face_mask_google_mediapipe(
+                    first_pass_done_images, mask_blur_amount, 0
+                )
+
+                # Based on face detection, crop base image, mask image and pose image (if available)
+                # to the face and save them to self.output_paths
+                (
+                    cropped_face,
+                    cropped_mask,
+                    cropped_control,
+                    left_top,
+                    orig_size,
+                ) = crop_faces_to_square(
+                    first_pass_done_images[0],
+                    face_masks[0],
+                    pose_image,
+                    face_padding,
+                    face_resize_to,
+                )
+
+                head_mask, head_mask_no_blur = get_head_mask(
+                    cropped_face, mask_blur_amount
+                )
+
+                if show_debug_images:
+                    # Add all to self.output_paths
+                    images_to_add = [
+                        cropped_face,
+                        cropped_mask,
+                        cropped_control,
+                        head_mask,
+                    ]
+                    for i, image in enumerate(images_to_add):
+                        # If image is image and exists
+                        if image and image.size:
+                            output_path = f"/tmp/out-processing-{o}-{i}.png"
+                            image.save(output_path)
+                            self.output_paths.append(Path(output_path))
+
+                inpaint_seed = int.from_bytes(os.urandom(2), "big")
+                # Run inpainting pipeline
+                inpaint_generator = torch.Generator("cuda").manual_seed(inpaint_seed)
+
+                common_args = {
+                    "guidance_scale": inpaint_guidance_scale,
+                    "generator": inpaint_generator,
+                    "num_inference_steps": inpaint_num_inference_steps,
+                }
+
+                inpaint_kwargs = {}
+
+                if upscale_face:
+                    upscaled_face = self.upscale_image_pil(cropped_face)
+                    if show_debug_images:
+                        # Add to self.output_paths
+                        output_path = f"/tmp/out-upscale-face-{o}.png"
+                        upscaled_face.save(output_path)
+                        self.output_paths.append(Path(output_path))
+                else:
+                    upscaled_face = cropped_face
+
+                inpaint_kwargs["image"] = upscaled_face
+                inpaint_kwargs["mask_image"] = head_mask
+                inpaint_kwargs["strength"] = inpaint_strength
+                inpaint_kwargs["width"] = cropped_face.width
+                inpaint_kwargs["height"] = cropped_face.height
+
+                # Run inpainting pipeline
+                if cropped_control:
+                    pipe = self.build_controlnet_pipeline(
+                        StableDiffusionControlNetInpaintPipeline,
+                        self.controlnet,
+                    )
+                    controlnet_args = {
+                        "controlnet_conditioning_scale": inpaint_controlnet_conditioning_scale,
+                        "control_guidance_start": inpaint_controlnet_start,
+                        "control_guidance_end": inpaint_controlnet_end,
+                        "control_image": cropped_control,
+                    }
+                else:
+                    pipe = self.inpaint_pipe
+
+                inpaint_prompt = inpaint_prompt + ", " + root_prompt
+                inpaint_negative_prompt = (
+                    inpaint_negative_prompt + ", " + root_negative_prompt
+                )
+
+                (
+                    inpaint_prompt_embeds,
+                    inpaint_negative_prompt_embeds,
+                ) = get_weighted_text_embeddings(
+                    pipe, inpaint_prompt, inpaint_negative_prompt
+                )
+
+                common_args["prompt_embeds"] = inpaint_prompt_embeds
+                common_args["negative_prompt_embeds"] = inpaint_negative_prompt_embeds
+
+                inpaint_pass = pipe(**common_args, **inpaint_kwargs, **controlnet_args)
+
+                # Paste inpainted face back into original image
+                pasted_image = paste_inpaint_into_original_image(
+                    first_pass_done_images[0],
+                    left_top,
+                    inpaint_pass.images[0],
+                    orig_size,
+                    head_mask_no_blur,
+                )
+
+                # Save both inpaint result and pasted image to self.output_paths
+                images_to_add = [
+                    inpaint_pass.images[0],
+                    pasted_image,
+                ]
+
+                for i, image in enumerate(images_to_add):
+                    output_path = f"/tmp/out-final-{o}-{i}.png"
+                    image.save(output_path)
+                    self.output_paths.append(Path(output_path))
+
+            if upscale_final_image:
+                last_output_image_pil = Image.open(self.output_paths[-1])
+                upscaled_image = self.upscale_image_pil(last_output_image_pil)
+                # Add to self.output_paths
+                output_path = f"/tmp/out-upscale-final-{o}.png"
+                upscaled_image.save(output_path)
+                self.output_paths.append(Path(output_path))
 
         return self.output_paths

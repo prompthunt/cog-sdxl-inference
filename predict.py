@@ -443,7 +443,7 @@ class Predictor(BasePredictor):
             le=1.0,
             default=1.0,
         ),
-        fix_face: bool = Input(
+        inpaint_face: bool = Input(
             description="Fix the face in the image",
             default=False,
         ),
@@ -513,6 +513,10 @@ class Predictor(BasePredictor):
             ge=0.0,
             le=1.0,
             default=1.0,
+        ),
+        show_debug_images: bool = Input(
+            description="Show debug images",
+            default=False,
         ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
@@ -630,46 +634,48 @@ class Predictor(BasePredictor):
             else:
                 print("No source image provided, skipping face swap")
 
-        face_masks = face_mask_google_mediapipe(
-            first_pass_done_images, mask_blur_amount, 0
-        )
+        # inpaint_face
+        if inpaint_face:
+            face_masks = face_mask_google_mediapipe(
+                first_pass_done_images, mask_blur_amount, 0
+            )
 
-        # Based on face detection, crop base image, mask image and pose image (if available)
-        # to the face and save them to self.output_paths
-        (
-            cropped_face,
-            cropped_mask,
-            cropped_control,
-            left_top,
-            orig_size,
-        ) = crop_faces_to_square(
-            first_pass_done_images[0],
-            face_masks[0],
-            pose_image,
-            face_padding,
-            face_resize_to,
-        )
+            # Based on face detection, crop base image, mask image and pose image (if available)
+            # to the face and save them to self.output_paths
+            (
+                cropped_face,
+                cropped_mask,
+                cropped_control,
+                left_top,
+                orig_size,
+            ) = crop_faces_to_square(
+                first_pass_done_images[0],
+                face_masks[0],
+                pose_image,
+                face_padding,
+                face_resize_to,
+            )
 
-        head_mask, head_mask_no_blur = get_head_mask(cropped_face, mask_blur_amount)
+            head_mask, head_mask_no_blur = get_head_mask(cropped_face, mask_blur_amount)
 
-        # Add all to self.output_paths
-        images_to_add = [
-            cropped_face,
-            cropped_mask,
-            cropped_control,
-            head_mask,
-        ]
-        for i, image in enumerate(images_to_add):
-            # If image is image and exists
-            if image and image.size:
-                output_path = f"/tmp/out-processing-{i}.png"
-                image.save(output_path)
-                self.output_paths.append(Path(output_path))
+            if show_debug_images:
+                # Add all to self.output_paths
+                images_to_add = [
+                    cropped_face,
+                    cropped_mask,
+                    cropped_control,
+                    head_mask,
+                ]
+                for i, image in enumerate(images_to_add):
+                    # If image is image and exists
+                    if image and image.size:
+                        output_path = f"/tmp/out-processing-{i}.png"
+                        image.save(output_path)
+                        self.output_paths.append(Path(output_path))
 
-        # fix_face
-        if fix_face:
+            inpaint_seed = int.from_bytes(os.urandom(2), "big")
             # Run inpainting pipeline
-            inpaint_generator = torch.Generator("cuda").manual_seed(seed)
+            inpaint_generator = torch.Generator("cuda").manual_seed(inpaint_seed)
 
             common_args = {
                 "guidance_scale": inpaint_guidance_scale,
@@ -679,16 +685,16 @@ class Predictor(BasePredictor):
 
             inpaint_kwargs = {}
 
-            if upscale_face:
-                upscaled_face = self.upscale_image_pil(cropped_face)
-                # Add to self.output_paths
-                output_path = f"/tmp/out-upscale-face.png"
-                upscaled_face.save(output_path)
-                self.output_paths.append(Path(output_path))
-            else:
-                upscaled_face = cropped_face
+            # if upscale_face:
+            #     upscaled_face = self.upscale_image_pil(cropped_face)
+            #     # Add to self.output_paths
+            #     output_path = f"/tmp/out-upscale-face.png"
+            #     upscaled_face.save(output_path)
+            #     self.output_paths.append(Path(output_path))
+            # else:
+            #     upscaled_face = cropped_face
 
-            inpaint_kwargs["image"] = upscaled_face
+            inpaint_kwargs["image"] = cropped_face
             inpaint_kwargs["mask_image"] = head_mask
             inpaint_kwargs["strength"] = inpaint_strength
             inpaint_kwargs["width"] = cropped_face.width
@@ -708,6 +714,11 @@ class Predictor(BasePredictor):
                 }
             else:
                 pipe = self.inpaint_pipe
+
+            inpaint_prompt = inpaint_prompt + ", " + root_prompt
+            inpaint_negative_prompt = (
+                inpaint_negative_prompt + ", " + root_negative_prompt
+            )
 
             (
                 inpaint_prompt_embeds,

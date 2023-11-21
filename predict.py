@@ -109,12 +109,6 @@ class Predictor(BasePredictor):
         try:
             # Convert PIL Image to numpy array if necessary
             img = np.array(img)
-            if len(img.shape) == 2 or (len(img.shape) == 3 and img.shape[2] == 1):
-                # Convert grayscale to RGB
-                img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-            h, w = img.shape[0:2]
-            if h < 300:
-                img = cv2.resize(img, (w * 2, h * 2), interpolation=cv2.INTER_LANCZOS4)
 
             # Enhance the image using GFPGAN
             _, _, output = self.face_enhancer.enhance(
@@ -192,6 +186,9 @@ class Predictor(BasePredictor):
         self.face_enhancer = GFPGANer(
             model_path="gfpgan/weights/GFPGANv1.4.pth",
             upscale=1,
+            arch="clean",
+            channel_multiplier=2,
+            bg_upsampler=self.upsampler,
         )
         self.current_version = "v1.4"
 

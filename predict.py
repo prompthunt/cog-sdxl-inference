@@ -56,6 +56,7 @@ from image_processing import (
     get_head_mask,
 )
 from lpw_pipeline import get_weighted_text_embeddings
+from codeformer.app import inference_app
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
@@ -519,6 +520,16 @@ class Predictor(BasePredictor):
             description="Upscale the final image using GFPGAN",
             default=False,
         ),
+        upscale_scale: float = Input(
+            description="Upscale scale",
+            default=2,
+        ),
+        codeformer_fidelity: float = Input(
+            description="Codeformer fidelity",
+            default=0.7,
+            ge=0.0,
+            le=1.0,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         weights = weights.replace(
@@ -771,11 +782,13 @@ class Predictor(BasePredictor):
                     self.output_paths.append(Path(output_path))
 
             if upscale_final_image:
-                last_output_image_pil = Image.open(self.output_paths[-1])
-                upscaled_image = self.upscale_image_pil(last_output_image_pil)
-                # Add to self.output_paths
-                output_path = f"/tmp/out-upscale-final-{o}.png"
-                upscaled_image.save(output_path)
-                self.output_paths.append(Path(output_path))
+                result_path = inference_app(
+                    image=self.output_paths[-1],
+                    background_enhance=True,
+                    face_upsample=True,
+                    upscale=upscale_scale,
+                    codeformer_fidelity=codeformer_fidelity,
+                )
+                self.output_paths.append(Path(result_path))
 
         return self.output_paths

@@ -792,8 +792,11 @@ class Predictor(BasePredictor):
                     upscale=upscale_scale,
                     codeformer_fidelity=codeformer_fidelity,
                 )
-                self.output_paths.append(Path(result_path))
+                # Save to new path
+                new_path = f"/tmp/out-final-upscale-{o}.png"
+                shutil.copyfile(result_path, new_path)
+                self.output_paths.append(Path(new_path))
 
-                print("FINISHED IMAGE ", self.output_paths[-1])
+                print("FINISHED IMAGE ", new_path)
 
         return self.output_paths

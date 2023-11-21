@@ -344,7 +344,7 @@ class Predictor(BasePredictor):
         ),
         root_prompt: str = Input(
             description="Prompt added on top of every prediction",
-            default="crisp details, neutral expression, high-definition, sharp focus, ambient lighting, masterpiece, cinematic light, cinematic lighting, ultrarealistic, photorealistic, 8k, raw photo, realistic, sharp focus on eyes, symmetrical eyes, intact eyes, hyperrealistic, highest quality, best quality, , highly detailed, masterpiece, best quality, extremely detailed 8k wallpaper, masterpiece, best quality, ultra-detailed, best shadow, detailed background, detailed face, detailed eyes, high contrast, best illumination, detailed face, dulux, caustic, dynamic angle, detailed glow. dramatic lighting. highly detailed, insanely detailed hair, symmetrical, intricate details, professionally retouched, 8k high definition. strong bokeh. award winning photo.",
+            default="crisp details, neutral expression, high-definition, sharp focus, ambient lighting, masterpiece, cinematic light, cinematic lighting, ultrarealistic, photorealistic, 8k, raw photo, realistic, sharp focus on eyes, symmetrical eyes, intact eyes, hyperrealistic, highest quality, best quality, highly detailed, masterpiece, best quality, extremely detailed 8k wallpaper, masterpiece, best quality, ultra-detailed, best shadow, detailed background, detailed face, detailed eyes, high contrast, best illumination, detailed face, dulux, caustic, dynamic angle, detailed glow. dramatic lighting. highly detailed, insanely detailed hair, symmetrical, intricate details, professionally retouched, 8k high definition. strong bokeh. award winning photo.",
         ),
         root_negative_prompt: str = Input(
             description="Input prompt",
@@ -753,7 +753,10 @@ class Predictor(BasePredictor):
                     inpaint_prompt_embeds,
                     inpaint_negative_prompt_embeds,
                 ) = get_weighted_text_embeddings(
-                    pipe, inpaint_prompt, inpaint_negative_prompt
+                    pipe,
+                    inpaint_prompt,
+                    inpaint_negative_prompt,
+                    max_embeddings_multiples=4,
                 )
 
                 common_args["prompt_embeds"] = inpaint_prompt_embeds

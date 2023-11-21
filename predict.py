@@ -689,16 +689,17 @@ class Predictor(BasePredictor):
 
             inpaint_kwargs = {}
 
-            # if upscale_face:
-            #     upscaled_face = self.upscale_image_pil(cropped_face)
-            #     # Add to self.output_paths
-            #     output_path = f"/tmp/out-upscale-face.png"
-            #     upscaled_face.save(output_path)
-            #     self.output_paths.append(Path(output_path))
-            # else:
-            #     upscaled_face = cropped_face
+            if upscale_face:
+                upscaled_face = self.upscale_image_pil(cropped_face)
+                if show_debug_images:
+                    # Add to self.output_paths
+                    output_path = f"/tmp/out-upscale-face.png"
+                    upscaled_face.save(output_path)
+                    self.output_paths.append(Path(output_path))
+            else:
+                upscaled_face = cropped_face
 
-            inpaint_kwargs["image"] = cropped_face
+            inpaint_kwargs["image"] = upscaled_face
             inpaint_kwargs["mask_image"] = head_mask
             inpaint_kwargs["strength"] = inpaint_strength
             inpaint_kwargs["width"] = cropped_face.width

@@ -649,15 +649,12 @@ class Predictor(BasePredictor):
             if should_swap_face:
                 if source_image:
                     # Swap all faces in first pass images
-                    for i, img in enumerate(first_pass.images):
-                        output_path = f"/tmp/out-faceswap-{o}-{i}.png"
-                        swapped_image = self.swap_face(
-                            self.output_paths[i], source_image
-                        )
-                        swapped_image.save(output_path)
-                        if show_debug_images:
-                            self.output_paths.append(Path(output_path))
-                        swapped_images.append(swapped_image)
+                    output_path = f"/tmp/out-faceswap-{o}.png"
+                    swapped_image = self.swap_face(self.output_paths[0], source_image)
+                    swapped_image.save(output_path)
+                    if show_debug_images:
+                        self.output_paths.append(Path(output_path))
+                    swapped_images.append(swapped_image)
 
                     first_pass_done_images = swapped_images
                 else:

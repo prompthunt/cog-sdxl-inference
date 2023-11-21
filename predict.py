@@ -344,6 +344,14 @@ class Predictor(BasePredictor):
             + ", ".join(EMBEDDING_TOKENS),
             default="",
         ),
+        root_prompt: str = Input(
+            description="Prompt added on top of every prediction",
+            default="crisp details, neutral expression, high-definition, sharp focus, ambient lighting, masterpiece, cinematic light, cinematic lighting, ultrarealistic, photorealistic, 8k, raw photo, realistic, sharp focus on eyes, symmetrical eyes, intact eyes, hyperrealistic, highest quality, best quality, , highly detailed, masterpiece, best quality, extremely detailed 8k wallpaper, masterpiece, best quality, ultra-detailed, best shadow, detailed background, detailed face, detailed eyes, high contrast, best illumination, detailed face, dulux, caustic, dynamic angle, detailed glow. dramatic lighting. highly detailed, insanely detailed hair, symmetrical, intricate details, professionally retouched, 8k high definition. strong bokeh. award winning photo.",
+        ),
+        root_negative_prompt: str = Input(
+            description="Input prompt",
+            default="old, multiple heads, 2 heads, elongated body, double image, 2 faces, multiple people, double head, <cyberrealistic-neg>, <badhandv4>, <negative-hand>, <baddream> , (nsfw), nsfw, nsfw, nsfw, nude, nude, nude, porn, porn, porn, naked, naked, nude, porn, frilly, frilled, lacy, ruffled, armpit hair, victorian, (sunglasses), (sunglasses), (deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime:1.4), text, close up, cropped, out of frame, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck",
+        ),
         image: Path = Input(
             description="Input image for img2img or inpaint mode",
             default=None,
@@ -579,6 +587,9 @@ class Predictor(BasePredictor):
 
         pipe.scheduler = SCHEDULERS[scheduler].from_config(pipe.scheduler.config)
         generator = torch.Generator("cuda").manual_seed(seed)
+
+        prompt = root_prompt + ", " + prompt
+        negative_prompt = root_negative_prompt + ", " + negative_prompt
 
         prompt_embeds, negative_prompt_embeds = get_weighted_text_embeddings(
             pipe, prompt, negative_prompt

@@ -794,4 +794,6 @@ class Predictor(BasePredictor):
                 )
                 self.output_paths.append(Path(result_path))
 
+                print("FINISHED IMAGE ", self.output_paths[-1])
+
         return self.output_paths

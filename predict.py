@@ -635,11 +635,12 @@ class Predictor(BasePredictor):
 
             first_pass = pipe(**common_args, **kwargs, **controlnet_args)
 
-            if show_debug_images:
-                for i, img in enumerate(first_pass.images):
-                    output_path = f"/tmp/out-{o}-{i}.png"
-                    img.save(output_path)
-                    self.output_paths.append(Path(output_path))
+            for i, img in enumerate(first_pass.images):
+                output_path = f"/tmp/out-{o}-{i}.png"
+                img.save(output_path)
+                first_pass_output_path = Path(output_path)
+                if show_debug_images:
+                    self.output_paths.append(first_pass_output_path)
 
             swapped_images = []
 
@@ -650,7 +651,7 @@ class Predictor(BasePredictor):
                 if source_image:
                     # Swap all faces in first pass images
                     output_path = f"/tmp/out-faceswap-{o}.png"
-                    swapped_image = self.swap_face(self.output_paths[0], source_image)
+                    swapped_image = self.swap_face(first_pass_output_path, source_image)
                     swapped_image.save(output_path)
                     if show_debug_images:
                         self.output_paths.append(Path(output_path))
@@ -777,12 +778,14 @@ class Predictor(BasePredictor):
                 for i, img in enumerate(images_to_add):
                     output_path = f"/tmp/out-final-{o}-{i}.png"
                     img.save(output_path)
-                    if show_debug_images and upscale_final_image:
-                        self.output_paths.append(Path(output_path))
+                    final_unupscaled_image = Path(output_path)
+                    # If no upscale_final_image and show debug
+                    if show_debug_images and not upscale_final_image:
+                        self.output_paths.append(final_unupscaled_image)
 
             if upscale_final_image:
                 result_path = inference_app(
-                    image=self.output_paths[-1],
+                    image=final_unupscaled_image,
                     background_enhance=True,
                     face_upsample=True,
                     upscale=upscale_scale,

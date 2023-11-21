@@ -554,6 +554,8 @@ class Predictor(BasePredictor):
         if mask:
             mask = self.load_image(mask)
 
+        self.output_paths = []
+
         # For loop num_outputs for whole pipeline
         for o in range(num_outputs):
             if seed is None:
@@ -616,11 +618,11 @@ class Predictor(BasePredictor):
             pipe.scheduler = SCHEDULERS[scheduler].from_config(pipe.scheduler.config)
             generator = torch.Generator("cuda").manual_seed(seed)
 
-            prompt = root_prompt + ", " + prompt
-            negative_prompt = root_negative_prompt + ", " + negative_prompt
-
             prompt_embeds, negative_prompt_embeds = get_weighted_text_embeddings(
-                pipe, prompt, negative_prompt, max_embeddings_multiples=4
+                pipe,
+                prompt=root_prompt + ", " + prompt,
+                uncond_prompt=root_negative_prompt + ", " + negative_prompt,
+                max_embeddings_multiples=4,
             )
 
             common_args = {
@@ -633,10 +635,9 @@ class Predictor(BasePredictor):
 
             first_pass = pipe(**common_args, **kwargs, **controlnet_args)
 
-            self.output_paths = []
-            for i, image in enumerate(first_pass.images):
+            for i, img in enumerate(first_pass.images):
                 output_path = f"/tmp/out-{o}-{i}.png"
-                image.save(output_path)
+                img.save(output_path)
                 self.output_paths.append(Path(output_path))
 
             swapped_images = []
@@ -647,7 +648,7 @@ class Predictor(BasePredictor):
             if should_swap_face:
                 if source_image:
                     # Swap all faces in first pass images
-                    for i, image in enumerate(first_pass.images):
+                    for i, img in enumerate(first_pass.images):
                         output_path = f"/tmp/out-faceswap-{o}-{i}.png"
                         swapped_image = self.swap_face(
                             self.output_paths[i], source_image
@@ -694,11 +695,11 @@ class Predictor(BasePredictor):
                         cropped_control,
                         head_mask,
                     ]
-                    for i, image in enumerate(images_to_add):
+                    for i, img in enumerate(images_to_add):
                         # If image is image and exists
-                        if image and image.size:
+                        if img and img.size:
                             output_path = f"/tmp/out-processing-{o}-{i}.png"
-                            image.save(output_path)
+                            img.save(output_path)
                             self.output_paths.append(Path(output_path))
 
                 inpaint_seed = int.from_bytes(os.urandom(2), "big")
@@ -744,18 +745,13 @@ class Predictor(BasePredictor):
                 else:
                     pipe = self.inpaint_pipe
 
-                inpaint_prompt = inpaint_prompt + ", " + root_prompt
-                inpaint_negative_prompt = (
-                    inpaint_negative_prompt + ", " + root_negative_prompt
-                )
-
                 (
                     inpaint_prompt_embeds,
                     inpaint_negative_prompt_embeds,
                 ) = get_weighted_text_embeddings(
                     pipe,
-                    inpaint_prompt,
-                    inpaint_negative_prompt,
+                    prompt=inpaint_prompt + ", " + root_prompt,
+                    uncond_prompt=inpaint_negative_prompt + ", " + root_negative_prompt,
                     max_embeddings_multiples=4,
                 )
 
@@ -779,9 +775,9 @@ class Predictor(BasePredictor):
                     pasted_image,
                 ]
 
-                for i, image in enumerate(images_to_add):
+                for i, img in enumerate(images_to_add):
                     output_path = f"/tmp/out-final-{o}-{i}.png"
-                    image.save(output_path)
+                    img.save(output_path)
                     self.output_paths.append(Path(output_path))
 
             if upscale_final_image:

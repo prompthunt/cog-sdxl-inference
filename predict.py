@@ -45,7 +45,6 @@ from gfpgan import GFPGANer
 from realesrgan.utils import RealESRGANer
 from basicsr.archs.srvgg_arch import SRVGGNetCompact
 import cv2
-from compel import Compel
 from transformers import CLIPFeatureExtractor
 import insightface
 import onnxruntime
@@ -56,6 +55,7 @@ from image_processing import (
     paste_inpaint_into_original_image,
     get_head_mask,
 )
+from lpw_pipeline import get_weighted_text_embeddings
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
@@ -68,7 +68,9 @@ REFINER_URL = (
 )
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 
-EMBEDDINGS = [(x.split(".")[0], EMBEDDINGS_CACHE + x) for x in os.listdir(EMBEDDINGS_CACHE)]
+EMBEDDINGS = [
+    (x.split(".")[0], EMBEDDINGS_CACHE + x) for x in os.listdir(EMBEDDINGS_CACHE)
+]
 EMBEDDING_TOKENS = [x[0] for x in EMBEDDINGS]
 EMBEDDING_PATHS = [x[1] for x in EMBEDDINGS]
 
@@ -578,15 +580,13 @@ class Predictor(BasePredictor):
         pipe.scheduler = SCHEDULERS[scheduler].from_config(pipe.scheduler.config)
         generator = torch.Generator("cuda").manual_seed(seed)
 
-        compel_proc = Compel(
-            tokenizer=pipe.tokenizer,
-            text_encoder=pipe.text_encoder,
-            truncate_long_prompts=False
+        prompt_embeds, negative_prompt_embeds = get_weighted_text_embeddings(
+            pipe, prompt, negative_prompt
         )
 
         common_args = {
-            "prompt_embeds": compel_proc(prompt),
-            "negative_prompt_embeds": compel_proc(negative_prompt),
+            "prompt_embeds": prompt_embeds,
+            "negative_prompt_embeds": negative_prompt_embeds,
             "guidance_scale": guidance_scale,
             "generator": generator,
             "num_inference_steps": num_inference_steps,
@@ -659,9 +659,8 @@ class Predictor(BasePredictor):
         if fix_face:
             # Run inpainting pipeline
             inpaint_generator = torch.Generator("cuda").manual_seed(seed)
+
             common_args = {
-                "prompt": [inpaint_prompt] * num_outputs,
-                "negative_prompt": [inpaint_negative_prompt] * num_outputs,
                 "guidance_scale": inpaint_guidance_scale,
                 "generator": inpaint_generator,
                 "num_inference_steps": inpaint_num_inference_steps,
@@ -698,6 +697,16 @@ class Predictor(BasePredictor):
                 }
             else:
                 pipe = self.inpaint_pipe
+
+            (
+                inpaint_prompt_embeds,
+                inpaint_negative_prompt_embeds,
+            ) = get_weighted_text_embeddings(
+                pipe, inpaint_prompt, inpaint_negative_prompt
+            )
+
+            common_args["prompt_embeds"] = inpaint_prompt_embeds
+            common_args["negative_prompt_embeds"] = inpaint_negative_prompt_embeds
 
             inpaint_pass = pipe(**common_args, **inpaint_kwargs, **controlnet_args)
 

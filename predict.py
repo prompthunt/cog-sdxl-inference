@@ -534,6 +534,15 @@ class Predictor(BasePredictor):
         if self.txt2img_pipe.vae.dtype == torch.float32:
             self.txt2img_pipe.vae.to(dtype=torch.float16)
 
+        if pose_image:
+            pose_image = self.load_image(pose_image)
+
+        if image:
+            image = self.load_image(image)
+
+        if mask:
+            mask = self.load_image(mask)
+
         # For loop num_outputs for whole pipeline
         for o in range(num_outputs):
             if seed is None:
@@ -545,14 +554,14 @@ class Predictor(BasePredictor):
             kwargs = {}
             if image and mask:
                 print("inpainting mode")
-                kwargs["image"] = self.load_image(image)
-                kwargs["mask_image"] = self.load_image(mask)
+                kwargs["image"] = image
+                kwargs["mask_image"] = mask
                 kwargs["strength"] = prompt_strength
                 kwargs["width"] = width
                 kwargs["height"] = height
             elif image:
                 print("img2img mode")
-                kwargs["image"] = self.load_image(image)
+                kwargs["image"] = image
                 kwargs["strength"] = prompt_strength
             else:
                 print("txt2img mode")
@@ -567,21 +576,20 @@ class Predictor(BasePredictor):
                     "control_guidance_start": controlnet_start,
                     "control_guidance_end": controlnet_end,
                 }
-                pose_image_loaded = self.load_image(pose_image)
                 if image and mask:
-                    controlnet_args["control_image"] = pose_image_loaded
+                    controlnet_args["control_image"] = pose_image
                     pipe = self.build_controlnet_pipeline(
                         StableDiffusionControlNetInpaintPipeline,
                         self.controlnet,
                     )
                 elif image:
-                    controlnet_args["control_image"] = pose_image_loaded
+                    controlnet_args["control_image"] = pose_image
                     pipe = self.build_controlnet_pipeline(
                         StableDiffusionControlNetImg2ImgPipeline,
                         self.controlnet,
                     )
                 else:
-                    controlnet_args["image"] = pose_image_loaded
+                    controlnet_args["image"] = pose_image
                     pipe = self.build_controlnet_pipeline(
                         StableDiffusionControlNetPipeline,
                         self.controlnet,
@@ -658,7 +666,7 @@ class Predictor(BasePredictor):
                 ) = crop_faces_to_square(
                     first_pass_done_images[0],
                     face_masks[0],
-                    pose_image_loaded,
+                    pose_image,
                     face_padding,
                     face_resize_to,
                 )

@@ -518,6 +518,10 @@ class Predictor(BasePredictor):
             description="Show debug images",
             default=False,
         ),
+        upscale_final_image: bool = Input(
+            description="Upscale the final image using GFPGAN",
+            default=False,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
@@ -751,5 +755,13 @@ class Predictor(BasePredictor):
                 output_path = f"/tmp/out-final-{i}.png"
                 image.save(output_path)
                 self.output_paths.append(Path(output_path))
+
+        if upscale_final_image:
+            last_output_image_pil = Image.open(self.output_paths[-1])
+            upscaled_image = self.upscale_image_pil(last_output_image_pil)
+            # Add to self.output_paths
+            output_path = f"/tmp/out-upscale-final.png"
+            upscaled_image.save(output_path)
+            self.output_paths.append(Path(output_path))
 
         return self.output_paths

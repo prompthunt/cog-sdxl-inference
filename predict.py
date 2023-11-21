@@ -567,21 +567,21 @@ class Predictor(BasePredictor):
                     "control_guidance_start": controlnet_start,
                     "control_guidance_end": controlnet_end,
                 }
-                pose_image = self.load_image(pose_image)
+                pose_image_loaded = self.load_image(pose_image)
                 if image and mask:
-                    controlnet_args["control_image"] = pose_image
+                    controlnet_args["control_image"] = pose_image_loaded
                     pipe = self.build_controlnet_pipeline(
                         StableDiffusionControlNetInpaintPipeline,
                         self.controlnet,
                     )
                 elif image:
-                    controlnet_args["control_image"] = pose_image
+                    controlnet_args["control_image"] = pose_image_loaded
                     pipe = self.build_controlnet_pipeline(
                         StableDiffusionControlNetImg2ImgPipeline,
                         self.controlnet,
                     )
                 else:
-                    controlnet_args["image"] = pose_image
+                    controlnet_args["image"] = pose_image_loaded
                     pipe = self.build_controlnet_pipeline(
                         StableDiffusionControlNetPipeline,
                         self.controlnet,
@@ -601,7 +601,7 @@ class Predictor(BasePredictor):
             negative_prompt = root_negative_prompt + ", " + negative_prompt
 
             prompt_embeds, negative_prompt_embeds = get_weighted_text_embeddings(
-                pipe, prompt, negative_prompt
+                pipe, prompt, negative_prompt, max_embeddings_multiples=4
             )
 
             common_args = {
@@ -658,7 +658,7 @@ class Predictor(BasePredictor):
                 ) = crop_faces_to_square(
                     first_pass_done_images[0],
                     face_masks[0],
-                    pose_image,
+                    pose_image_loaded,
                     face_padding,
                     face_resize_to,
                 )

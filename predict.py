@@ -635,10 +635,11 @@ class Predictor(BasePredictor):
 
             first_pass = pipe(**common_args, **kwargs, **controlnet_args)
 
-            for i, img in enumerate(first_pass.images):
-                output_path = f"/tmp/out-{o}-{i}.png"
-                img.save(output_path)
-                self.output_paths.append(Path(output_path))
+            if show_debug_images:
+                for i, img in enumerate(first_pass.images):
+                    output_path = f"/tmp/out-{o}-{i}.png"
+                    img.save(output_path)
+                    self.output_paths.append(Path(output_path))
 
             swapped_images = []
 
@@ -654,7 +655,8 @@ class Predictor(BasePredictor):
                             self.output_paths[i], source_image
                         )
                         swapped_image.save(output_path)
-                        self.output_paths.append(Path(output_path))
+                        if show_debug_images:
+                            self.output_paths.append(Path(output_path))
                         swapped_images.append(swapped_image)
 
                     first_pass_done_images = swapped_images
@@ -778,7 +780,8 @@ class Predictor(BasePredictor):
                 for i, img in enumerate(images_to_add):
                     output_path = f"/tmp/out-final-{o}-{i}.png"
                     img.save(output_path)
-                    self.output_paths.append(Path(output_path))
+                    if show_debug_images and upscale_final_image:
+                        self.output_paths.append(Path(output_path))
 
             if upscale_final_image:
                 result_path = inference_app(

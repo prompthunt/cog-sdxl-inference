@@ -66,7 +66,6 @@ class KarrasDPM:
         return DPMSolverMultistepScheduler.from_config(
             config,
             use_karras_sigmas=True,
-            algorithm_type="sde-dpmsolver++",
         )
 
 
@@ -80,6 +79,7 @@ def make_scheduler(name, config):
         "KLMS": LMSDiscreteScheduler.from_config(config),
         "PNDM": PNDMScheduler.from_config(config),
         "UniPCMultistep": UniPCMultistepScheduler.from_config(config),
+        "KarrasDPM": KarrasDPM.from_config(config),
     }[name]
 
 
@@ -332,6 +332,7 @@ class Predictor(BasePredictor):
                 "KLMS",
                 "PNDM",
                 "UniPCMultistep",
+                "KarrasDPM"
             ],
             description="Choose a scheduler.",
         ),

@@ -332,7 +332,7 @@ class Predictor(BasePredictor):
                 "KLMS",
                 "PNDM",
                 "UniPCMultistep",
-                "KarrasDPM"
+                "KarrasDPM",
             ],
             description="Choose a scheduler.",
         ),
@@ -432,4 +432,3 @@ class Predictor(BasePredictor):
             output_path = f"/tmp/seed-{this_seed}.png"
             output.images[0].save(output_path)
             yield Path(output_path)
-            result_count += 1

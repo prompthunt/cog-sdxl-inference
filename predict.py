@@ -80,6 +80,13 @@ class KarrasDPM:
         )
 
 
+class KarrasDPMPP:
+    def from_config(config):
+        return DPMSolverMultistepScheduler.from_config(
+            config, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++"
+        )
+
+
 def make_scheduler(name, config):
     return {
         "DDIM": DDIMScheduler.from_config(config),
@@ -91,6 +98,7 @@ def make_scheduler(name, config):
         "PNDM": PNDMScheduler.from_config(config),
         "UniPCMultistep": UniPCMultistepScheduler.from_config(config),
         "KarrasDPM": KarrasDPM.from_config(config),
+        "DPM++SDEKarras": KarrasDPMPP.from_config(config),
     }[name]
 
 

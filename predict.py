@@ -49,6 +49,10 @@ from basicsr.archs.srvgg_arch import SRVGGNetCompact
 import cv2
 from compel import Compel
 from transformers import CLIPFeatureExtractor
+import insightface
+import onnxruntime
+from insightface.app import FaceAnalysis
+
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
@@ -185,6 +189,35 @@ class Predictor(BasePredictor):
             bg_upsampler=self.upsampler,
         )
         self.current_version = "v1.4"
+
+        self.face_swapper = insightface.model_zoo.get_model(
+            "cache/inswapper_128.onnx", providers=onnxruntime.get_available_providers()
+        )
+        self.face_analyser = FaceAnalysis(name="buffalo_l")
+        self.face_analyser.prepare(ctx_id=0, det_thresh=0.5, det_size=(640, 640))
+
+    # Target image is image to paste into
+    # Source image is image to take face from
+    def swap_face(self, target_image: Path, source_image: Path) -> Image.Image:
+        try:
+            frame = cv2.imread(str(target_image))
+            target_face = self.get_face(frame)
+            source_face = self.get_face(
+                cv2.imread(str(source_image)), image_type="source"
+            )
+            result = self.face_swapper.get(
+                frame, target_face, source_face, paste_back=True
+            )
+            _, _, result = self.face_enhancer.enhance(result, paste_back=True)
+
+            # Convert from BGR to RGB
+            result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+
+            # Convert to PIL Image
+            pil_image = Image.fromarray(result_rgb)
+            return pil_image
+        except Exception as e:
+            print("FACESWAP ERROR", str(e))
 
     def load_image(self, path):
         shutil.copyfile(path, "/tmp/image.png")
@@ -339,6 +372,14 @@ class Predictor(BasePredictor):
         seed: int = Input(
             description="Random seed. Leave blank to randomize the seed", default=None
         ),
+        should_swap_face: bool = Input(
+            description="Should swap face",
+            default=False,
+        ),
+        source_image: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
@@ -426,9 +467,18 @@ class Predictor(BasePredictor):
                 **extra_kwargs,
             )
 
-            if output.nsfw_content_detected and output.nsfw_content_detected[0]:
-                continue
-
             output_path = f"/tmp/seed-{this_seed}.png"
             output.images[0].save(output_path)
-            yield Path(output_path)
+            path_to_output = Path(output_path)
+            yield path_to_output
+
+            if should_swap_face:
+                if source_image:
+                    # Swap all faces in first pass images
+                    output_path = f"/tmp/seed-swapped-{this_seed}.png"
+                    swapped_image = self.swap_face(path_to_output, source_image)
+                    swapped_image.save(output_path)
+                    path_to_output = Path(output_path)
+                    yield path_to_output
+                else:
+                    print("No source image provided, skipping face swap")

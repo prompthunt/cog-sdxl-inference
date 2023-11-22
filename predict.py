@@ -48,6 +48,7 @@ from realesrgan.utils import RealESRGANer
 from basicsr.archs.srvgg_arch import SRVGGNetCompact
 import cv2
 from compel import Compel
+from controlnet_aux import OpenposeDetector
 from transformers import CLIPFeatureExtractor
 import insightface
 import onnxruntime
@@ -142,8 +143,19 @@ class Predictor(BasePredictor):
 
         return pipe
 
+    def process_control(self, control_image):
+        if control_image is None:
+            return None
+
+        return self.openpose(control_image)
+
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
+
+        print("Loading pose...")
+        self.openpose = OpenposeDetector.from_pretrained(
+            "lllyasviel/ControlNet", cache_dir="diffusers-cache"
+        )
 
         self.feature_extractor = CLIPFeatureExtractor.from_pretrained(
             "openai/clip-vit-base-patch32"
@@ -304,16 +316,37 @@ class Predictor(BasePredictor):
             text_encoder=self.txt2img_pipe.text_encoder,
         )
 
-        # print("Loading controlnet...")
+        print("Loading controlnet...")
+        controlnet = ControlNetModel.from_pretrained(
+            "lllyasviel/sd-controlnet-openpose",
+            torch_dtype=torch.float16,
+            cache_dir="diffusers-cache",
+            local_files_only=True,
+        )
 
-        # controlnetModel = "lllyasviel/control_v11p_sd15_openpose"
+        print("Loading controlnet txt2img...")
+        self.cnet_txt2img_pipe = StableDiffusionControlNetPipeline(
+            vae=self.txt2img_pipe.vae,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            tokenizer=self.txt2img_pipe.tokenizer,
+            unet=self.txt2img_pipe.unet,
+            scheduler=self.txt2img_pipe.scheduler,
+            safety_checker=self.txt2img_pipe.safety_checker,
+            feature_extractor=self.txt2img_pipe.feature_extractor,
+            controlnet=controlnet,
+        ).to("cuda")
 
-        # self.controlnet = ControlNetModel.from_pretrained(
-        #     controlnetModel,
-        #     torch_dtype=torch.float16,
-        #     cache_dir="diffusers-cache",
-        #     local_files_only=False,
-        # )
+        print("Loading controlnet img2img...")
+        self.cnet_img2img_pipe = StableDiffusionControlNetImg2ImgPipeline(
+            vae=self.txt2img_pipe.vae,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            tokenizer=self.txt2img_pipe.tokenizer,
+            unet=self.txt2img_pipe.unet,
+            scheduler=self.txt2img_pipe.scheduler,
+            safety_checker=self.txt2img_pipe.safety_checker,
+            feature_extractor=self.txt2img_pipe.feature_extractor,
+            controlnet=controlnet,
+        )
 
         print("Loaded pipelines in {:.2f} seconds".format(time.time() - start_time))
 
@@ -327,6 +360,10 @@ class Predictor(BasePredictor):
         self,
         weights: str = Input(
             description="Weights url",
+            default=None,
+        ),
+        control_image: Path = Input(
+            description="Optional Image to use for guidance based on posenet",
             default=None,
         ),
         image: Path = Input(
@@ -418,14 +455,32 @@ class Predictor(BasePredictor):
 
         if image:
             image = self.load_image(image)
-        # if control_image:
-        #     control_image = self.load_image(control_image)
-        #     control_image = self.process_control(control_image)
+        if control_image:
+            control_image = self.load_image(control_image)
+            control_image = self.process_control(control_image)
         if mask:
             mask = self.load_image(mask)
 
         kwargs = {}
-        if image and mask:
+        if control_image and mask:
+            raise ValueError("Cannot use controlnet and inpainting at the same time")
+        elif control_image and image:
+            print("Using ControlNet img2img")
+            pipe = self.cnet_img2img_pipe
+            extra_kwargs = {
+                "controlnet_conditioning_image": control_image,
+                "image": image,
+                "strength": prompt_strength,
+            }
+        elif control_image:
+            print("Using ControlNet txt2img")
+            pipe = self.cnet_txt2img_pipe
+            extra_kwargs = {
+                "image": control_image,
+                "width": width,
+                "height": height,
+            }
+        elif image and mask:
             print("Using inpaint pipeline")
             pipe = self.inpainting_pipe
             # FIXME(ja): prompt/negative_prompt are sent to the inpainting pipeline

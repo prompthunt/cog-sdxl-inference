@@ -308,7 +308,15 @@ class Predictor(BasePredictor):
 
         # https://huggingface.co/docs/diffusers/using-diffusers/weighted_prompts#textual-inversion
         # https://pypi.org/project/compel/ check out Textual Inversion support
+
         textual_inversion_manager = DiffusersTextualInversionManager(self.txt2img_pipe)
+
+        self.compel_proc = Compel(
+            tokenizer=self.txt2img_pipe.tokenizer,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            textual_inversion_manager=textual_inversion_manager,
+            truncate_long_prompts=False,
+        )
 
         print("Loading SD img2img pipeline...")
         self.img2img_pipe = StableDiffusionImg2ImgPipeline(
@@ -336,8 +344,6 @@ class Predictor(BasePredictor):
         self.compel = Compel(
             tokenizer=self.txt2img_pipe.tokenizer,
             text_encoder=self.txt2img_pipe.text_encoder,
-            textual_inversion_manager=textual_inversion_manager,
-            truncate_long_prompts=False,
         )
 
         print("Loading controlnet...")
@@ -534,19 +540,18 @@ class Predictor(BasePredictor):
         print(f"Negative Prompt: {negative_prompt}")
 
         if prompt:
-            print("parsed prompt:", self.compel.parse_prompt_string(prompt))
-            prompt_embeds = self.compel(prompt)
-        else:
-            prompt_embeds = None
-
-        if negative_prompt:
-            print(
-                "parsed negative prompt:",
-                self.compel.parse_prompt_string(negative_prompt),
+            conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+            if not negative_prompt:
+                negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+            negative_conditioning = self.compel_proc.build_conditioning_tensor(
+                negative_prompt
             )
-            negative_prompt_embeds = self.compel(negative_prompt)
-        else:
-            negative_prompt_embeds = None
+            [
+                prompt_embeds,
+                negative_prompt_embeds,
+            ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+                [conditioning, negative_conditioning]
+            )
 
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 

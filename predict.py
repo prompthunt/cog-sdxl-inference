@@ -21,6 +21,8 @@ from diffusers import (
     EulerDiscreteScheduler,
     HeunDiscreteScheduler,
     PNDMScheduler,
+    UniPCMultistepScheduler,
+    LMSDiscreteScheduler,
     StableDiffusionImg2ImgPipeline,
     StableDiffusionInpaintPipeline,
     ControlNetModel,
@@ -68,15 +70,17 @@ class KarrasDPM:
         )
 
 
-SCHEDULERS = {
-    "DDIM": DDIMScheduler,
-    "DPMSolverMultistep": DPMSolverMultistepScheduler,
-    "HeunDiscrete": HeunDiscreteScheduler,
-    "DPM++SDEKarras": KarrasDPM,
-    "K_EULER_ANCESTRAL": EulerAncestralDiscreteScheduler,
-    "K_EULER": EulerDiscreteScheduler,
-    "PNDM": PNDMScheduler,
-}
+def make_scheduler(name, config):
+    return {
+        "DDIM": DDIMScheduler.from_config(config),
+        "DPMSolverMultistep": DPMSolverMultistepScheduler.from_config(config),
+        "HeunDiscrete": HeunDiscreteScheduler.from_config(config),
+        "K_EULER_ANCESTRAL": EulerAncestralDiscreteScheduler.from_config(config),
+        "K_EULER": EulerDiscreteScheduler.from_config(config),
+        "KLMS": LMSDiscreteScheduler.from_config(config),
+        "PNDM": PNDMScheduler.from_config(config),
+        "UniPCMultistep": UniPCMultistepScheduler.from_config(config),
+    }[name]
 
 
 def download_weights(url, dest):
@@ -244,45 +248,52 @@ class Predictor(BasePredictor):
             feature_extractor=self.txt2img_pipe.feature_extractor,
         ).to("cuda")
 
-        print("Loading controlnet...")
-
-        controlnetModel = "lllyasviel/control_v11p_sd15_openpose"
-
-        self.controlnet = ControlNetModel.from_pretrained(
-            controlnetModel,
-            torch_dtype=torch.float16,
-            cache_dir="diffusers-cache",
-            local_files_only=False,
+        print("Loading compel...")
+        self.compel = Compel(
+            tokenizer=self.txt2img_pipe.tokenizer,
+            text_encoder=self.txt2img_pipe.text_encoder,
         )
+
+        # print("Loading controlnet...")
+
+        # controlnetModel = "lllyasviel/control_v11p_sd15_openpose"
+
+        # self.controlnet = ControlNetModel.from_pretrained(
+        #     controlnetModel,
+        #     torch_dtype=torch.float16,
+        #     cache_dir="diffusers-cache",
+        #     local_files_only=False,
+        # )
 
         print("Loaded pipelines in {:.2f} seconds".format(time.time() - start_time))
 
-        self.txt2img_pipe.set_progress_bar_config(disable=True)
-        self.img2img_pipe.set_progress_bar_config(disable=True)
+        # self.txt2img_pipe.set_progress_bar_config(disable=True)
+        # self.img2img_pipe.set_progress_bar_config(disable=True)
+        # self.inpaint_pipe.set_progress_bar_config(disable=True)
         self.url = url
 
     @torch.inference_mode()
     def predict(
         self,
         weights: str = Input(
-            description="LoRA weights to use. Leave blank to use the default weights.",
+            description="Weights url",
+            default=None,
+        ),
+        image: Path = Input(
+            description="Optional Image to use for img2img guidance",
+            default=None,
+        ),
+        mask: Path = Input(
+            description="Optional Mask to use for legacy inpainting",
             default=None,
         ),
         prompt: str = Input(
             description="Input prompt",
-            default="An photo of cjw man",
+            default="photo of cjw person",
         ),
         negative_prompt: str = Input(
-            description="Input Negative Prompt",
+            description="Specify things to not see in the output",
             default="",
-        ),
-        image: Path = Input(
-            description="Input image for img2img or inpaint mode",
-            default=None,
-        ),
-        mask: Path = Input(
-            description="Input mask for inpaint mode. Black areas will be preserved, white areas will be inpainted.",
-            default=None,
         ),
         width: int = Input(
             description="Width of output image",
@@ -298,11 +309,6 @@ class Predictor(BasePredictor):
             le=4,
             default=1,
         ),
-        scheduler: str = Input(
-            description="scheduler",
-            choices=SCHEDULERS.keys(),
-            default="K_EULER",
-        ),
         num_inference_steps: int = Input(
             description="Number of denoising steps", ge=1, le=500, default=50
         ),
@@ -310,125 +316,27 @@ class Predictor(BasePredictor):
             description="Scale for classifier-free guidance", ge=1, le=50, default=7.5
         ),
         prompt_strength: float = Input(
-            description="Prompt strength when using img2img / inpaint. 1.0 corresponds to full destruction of information in image",
+            description="Prompt strength when using init image. 1.0 corresponds to full destruction of information in init image",
             ge=0.0,
             le=1.0,
             default=0.8,
+        ),
+        scheduler: str = Input(
+            default="DPMSolverMultistep",
+            choices=[
+                "DDIM",
+                "DPMSolverMultistep",
+                "HeunDiscrete",
+                "K_EULER_ANCESTRAL",
+                "K_EULER",
+                "KLMS",
+                "PNDM",
+                "UniPCMultistep",
+            ],
+            description="Choose a scheduler.",
         ),
         seed: int = Input(
             description="Random seed. Leave blank to randomize the seed", default=None
-        ),
-        refine: str = Input(
-            description="Which refine style to use",
-            choices=["no_refiner", "expert_ensemble_refiner", "base_image_refiner"],
-            default="no_refiner",
-        ),
-        high_noise_frac: float = Input(
-            description="For expert_ensemble_refiner, the fraction of noise to use",
-            default=0.8,
-            le=1.0,
-            ge=0.0,
-        ),
-        refine_steps: int = Input(
-            description="For base_image_refiner, the number of steps to refine, defaults to num_inference_steps",
-            default=None,
-        ),
-        disable_safety_checker: bool = Input(
-            description="Disable safety checker for generated images. This feature is only available through the API. See [https://replicate.com/docs/how-does-replicate-work#safety](https://replicate.com/docs/how-does-replicate-work#safety)",
-            default=True,
-        ),
-        pose_image: Path = Input(
-            description="Pose image for controlnet",
-            default=None,
-        ),
-        controlnet_conditioning_scale: float = Input(
-            description="How strong the controlnet conditioning is",
-            ge=0.0,
-            le=4.0,
-            default=0.75,
-        ),
-        controlnet_start: float = Input(
-            description="When controlnet conditioning starts",
-            ge=0.0,
-            le=1.0,
-            default=0.0,
-        ),
-        controlnet_end: float = Input(
-            description="When controlnet conditioning ends",
-            ge=0.0,
-            le=1.0,
-            default=1.0,
-        ),
-        fix_face: bool = Input(
-            description="Fix the face in the image",
-            default=False,
-        ),
-        mask_blur_amount: float = Input(
-            description="Amount of blur to apply to the mask.", default=8.0
-        ),
-        face_padding: float = Input(
-            description="Amount of padding (as percentage) to add to the face bounding box.",
-            default=2,
-        ),
-        face_resize_to: int = Input(
-            description="Resize the face bounding box to this size (in pixels).",
-            default=512,
-        ),
-        upscale_face: bool = Input(
-            description="Upscale the face using GFPGAN",
-            default=False,
-        ),
-        # ADD
-        # inpaint_num_inference_steps
-        # inpaint_guidance_scale
-        # inpaint_strength
-        # inpaint_lora_scale
-        # inpaint_controlnet_conditioning_scale
-        # inpaint_controlnet_start
-        # inpaint_controlnet_end
-        inpaint_prompt: str = Input(
-            description="Input prompt",
-            default="A photo of cjw man",
-        ),
-        inpaint_negative_prompt: str = Input(
-            description="Input Negative Prompt",
-            default="",
-        ),
-        inpaint_num_inference_steps: int = Input(
-            description="Number of denoising steps", ge=1, le=500, default=25
-        ),
-        inpaint_guidance_scale: float = Input(
-            description="Scale for classifier-free guidance", ge=1, le=50, default=3
-        ),
-        inpaint_strength: float = Input(
-            description="Prompt strength when using img2img / inpaint. 1.0 corresponds to full destruction of information in image",
-            ge=0.0,
-            le=1.0,
-            default=0.35,
-        ),
-        inpaint_lora_scale: float = Input(
-            description="LoRA additive scale. Only applicable on trained models.",
-            ge=0.0,
-            le=1.0,
-            default=0.6,
-        ),
-        inpaint_controlnet_conditioning_scale: float = Input(
-            description="How strong the controlnet conditioning is",
-            ge=0.0,
-            le=4.0,
-            default=0.75,
-        ),
-        inpaint_controlnet_start: float = Input(
-            description="When controlnet conditioning starts",
-            ge=0.0,
-            le=1.0,
-            default=0.0,
-        ),
-        inpaint_controlnet_end: float = Input(
-            description="When controlnet conditioning ends",
-            ge=0.0,
-            le=1.0,
-            default=1.0,
         ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
@@ -449,190 +357,78 @@ class Predictor(BasePredictor):
         if self.txt2img_pipe.vae.dtype == torch.float32:
             self.txt2img_pipe.vae.to(dtype=torch.float16)
 
+        if image:
+            image = self.load_image(image)
+        # if control_image:
+        #     control_image = self.load_image(control_image)
+        #     control_image = self.process_control(control_image)
+        if mask:
+            mask = self.load_image(mask)
+
         kwargs = {}
         if image and mask:
-            print("inpainting mode")
-            kwargs["image"] = self.load_image(image)
-            kwargs["mask_image"] = self.load_image(mask)
-            kwargs["strength"] = prompt_strength
-            kwargs["width"] = width
-            kwargs["height"] = height
-        elif image:
-            print("img2img mode")
-            kwargs["image"] = self.load_image(image)
-            kwargs["strength"] = prompt_strength
-        else:
-            print("txt2img mode")
-            kwargs["width"] = width
-            kwargs["height"] = height
-
-        controlnet_args = {}
-
-        if pose_image:
-            controlnet_args = {
-                "controlnet_conditioning_scale": controlnet_conditioning_scale,
-                "control_guidance_start": controlnet_start,
-                "control_guidance_end": controlnet_end,
+            print("Using inpaint pipeline")
+            pipe = self.inpainting_pipe
+            # FIXME(ja): prompt/negative_prompt are sent to the inpainting pipeline
+            # because it doesn't support prompt_embeds/negative_prompt_embeds
+            extra_kwargs = {
+                "prompt": prompt,
+                "negative_prompt": negative_prompt,
+                "image": image,
+                "mask_image": mask,
+                "strength": prompt_strength,
             }
-            pose_image = self.load_image(pose_image)
-            if image and mask:
-                controlnet_args["control_image"] = pose_image
-                pipe = self.build_controlnet_pipeline(
-                    StableDiffusionControlNetInpaintPipeline,
-                    self.controlnet,
-                )
-            elif image:
-                controlnet_args["control_image"] = pose_image
-                pipe = self.build_controlnet_pipeline(
-                    StableDiffusionControlNetImg2ImgPipeline,
-                    self.controlnet,
-                )
-            else:
-                controlnet_args["image"] = pose_image
-                pipe = self.build_controlnet_pipeline(
-                    StableDiffusionControlNetPipeline,
-                    self.controlnet,
-                )
-
+        elif image:
+            print("Using img2img pipeline")
+            pipe = self.img2img_pipe
+            extra_kwargs = {
+                "image": image,
+                "strength": prompt_strength,
+            }
         else:
-            if image:
-                pipe = self.img2img_pipe
-            else:
-                pipe = self.txt2img_pipe
+            print("Using txt2img pipeline")
+            pipe = self.txt2img_pipe
+            extra_kwargs = {
+                "width": width,
+                "height": height,
+            }
 
         print(f"Prompt: {prompt}")
+        print(f"Negative Prompt: {negative_prompt}")
 
-        pipe.scheduler = SCHEDULERS[scheduler].from_config(pipe.scheduler.config)
-        generator = torch.Generator("cuda").manual_seed(seed)
+        if prompt:
+            print("parsed prompt:", self.compel.parse_prompt_string(prompt))
+            prompt_embeds = self.compel(prompt)
+        else:
+            prompt_embeds = None
 
-        compel_proc = Compel(
-            tokenizer=pipe.tokenizer,
-            text_encoder=pipe.text_encoder,
-            truncate_long_prompts=False,
-        )
+        if negative_prompt:
+            print(
+                "parsed negative prompt:",
+                self.compel.parse_prompt_string(negative_prompt),
+            )
+            negative_prompt_embeds = self.compel(negative_prompt)
+        else:
+            negative_prompt_embeds = None
 
-        common_args = {
-            "prompt_embeds": compel_proc(prompt),
-            "negative_prompt_embeds": compel_proc(negative_prompt),
-            "guidance_scale": guidance_scale,
-            "generator": generator,
-            "num_inference_steps": num_inference_steps,
-        }
+        pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 
-        first_pass = pipe(**common_args, **kwargs, **controlnet_args)
-
-        output_paths = []
-        for i, image in enumerate(first_pass.images):
-            output_path = f"/tmp/out-{i}.png"
-            image.save(output_path)
-            output_paths.append(Path(output_path))
-
-        # fix_face
-        if fix_face:
-            from image_processing import (
-                face_mask_google_mediapipe,
-                crop_faces_to_square,
-                paste_inpaint_into_original_image,
-                get_head_mask,
+        for idx in range(num_outputs):
+            this_seed = seed + idx
+            generator = torch.Generator("cuda").manual_seed(this_seed)
+            output = pipe(
+                prompt_embeds=prompt_embeds,
+                negative_prompt_embeds=negative_prompt_embeds,
+                guidance_scale=guidance_scale,
+                generator=generator,
+                num_inference_steps=num_inference_steps,
+                **extra_kwargs,
             )
 
-            face_masks = face_mask_google_mediapipe(
-                first_pass.images, mask_blur_amount, 0
-            )
+            if output.nsfw_content_detected and output.nsfw_content_detected[0]:
+                continue
 
-            # Based on face detection, crop base image, mask image and pose image (if available)
-            # to the face and save them to output_paths
-            (
-                cropped_face,
-                cropped_mask,
-                cropped_control,
-                left_top,
-                orig_size,
-            ) = crop_faces_to_square(
-                first_pass.images[0],
-                face_masks[0],
-                pose_image,
-                face_padding,
-                face_resize_to,
-            )
-
-            head_mask, head_mask_no_blur = get_head_mask(cropped_face, mask_blur_amount)
-
-            # Add all to output_paths
-            images_to_add = [
-                cropped_face,
-                cropped_mask,
-                cropped_control,
-                head_mask,
-            ]
-            for i, image in enumerate(images_to_add):
-                # If image is image and exists
-                if image and image.size:
-                    output_path = f"/tmp/out-processing-{i}.png"
-                    image.save(output_path)
-                    output_paths.append(Path(output_path))
-
-            inpaint_generator = torch.Generator("cuda").manual_seed(seed)
-            common_args = {
-                "prompt": [inpaint_prompt] * num_outputs,
-                "negative_prompt": [inpaint_negative_prompt] * num_outputs,
-                "guidance_scale": inpaint_guidance_scale,
-                "generator": inpaint_generator,
-                "num_inference_steps": inpaint_num_inference_steps,
-            }
-
-            inpaint_kwargs = {}
-
-            if upscale_face:
-                upscaled_face = self.upscale_image_pil(cropped_face)
-                # Add to output_paths
-                output_path = f"/tmp/out-upscale-face.png"
-                upscaled_face.save(output_path)
-                output_paths.append(Path(output_path))
-            else:
-                upscaled_face = cropped_face
-
-            inpaint_kwargs["image"] = upscaled_face
-            inpaint_kwargs["mask_image"] = head_mask
-            inpaint_kwargs["strength"] = inpaint_strength
-            inpaint_kwargs["width"] = cropped_face.width
-            inpaint_kwargs["height"] = cropped_face.height
-
-            # Run inpainting pipeline
-            if cropped_control:
-                pipe = self.build_controlnet_pipeline(
-                    StableDiffusionControlNetInpaintPipeline,
-                    self.controlnet,
-                )
-                controlnet_args = {
-                    "controlnet_conditioning_scale": inpaint_controlnet_conditioning_scale,
-                    "control_guidance_start": inpaint_controlnet_start,
-                    "control_guidance_end": inpaint_controlnet_end,
-                    "control_image": cropped_control,
-                }
-            else:
-                pipe = self.inpaint_pipe
-
-            inpaint_pass = pipe(**common_args, **inpaint_kwargs, **controlnet_args)
-
-            # Paste inpainted face back into original image
-            pasted_image = paste_inpaint_into_original_image(
-                first_pass.images[0],
-                left_top,
-                inpaint_pass.images[0],
-                orig_size,
-                head_mask_no_blur,
-            )
-
-            # Save both inpaint result and pasted image to output_paths
-            images_to_add = [
-                inpaint_pass.images[0],
-                pasted_image,
-            ]
-
-            for i, image in enumerate(images_to_add):
-                output_path = f"/tmp/out-final-{i}.png"
-                image.save(output_path)
-                output_paths.append(Path(output_path))
-
-        return output_paths
+            output_path = f"/tmp/seed-{this_seed}.png"
+            output.images[0].save(output_path)
+            yield Path(output_path)
+            result_count += 1

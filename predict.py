@@ -524,14 +524,14 @@ class Predictor(BasePredictor):
         # else:
         #     prompt_embeds = None
 
-        if negative_prompt:
-            print(
-                "parsed negative prompt:",
-                self.compel.parse_prompt_string(negative_prompt),
-            )
-            negative_prompt_embeds = self.compel(negative_prompt)
-        else:
-            negative_prompt_embeds = None
+        # if negative_prompt:
+        #     print(
+        #         "parsed negative prompt:",
+        #         self.compel.parse_prompt_string(negative_prompt),
+        #     )
+        #     negative_prompt_embeds = self.compel(negative_prompt)
+        # else:
+        #     negative_prompt_embeds = None
 
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 

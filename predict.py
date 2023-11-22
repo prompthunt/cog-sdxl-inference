@@ -306,6 +306,8 @@ class Predictor(BasePredictor):
             EMBEDDING_PATHS, token=EMBEDDING_TOKENS, local_files_only=True
         )
 
+        # https://huggingface.co/docs/diffusers/using-diffusers/weighted_prompts#textual-inversion
+        # https://pypi.org/project/compel/ check out Textual Inversion support
         textual_inversion_manager = DiffusersTextualInversionManager(self.txt2img_pipe)
 
         self.compel_proc = Compel(

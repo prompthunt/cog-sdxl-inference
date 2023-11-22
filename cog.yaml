@@ -6,7 +6,6 @@ build:
   system_packages:
     - "libgl1-mesa-glx"
     - "ffmpeg"
-	@@ -12,21 +11,26 @@ build:
     - "cmake"
     - "zip"
   python_packages:

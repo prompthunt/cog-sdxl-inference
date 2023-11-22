@@ -65,6 +65,10 @@ REFINER_URL = (
 )
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 
+EMBEDDINGS = [(x.split(".")[0], "/embeddings/" + x) for x in os.listdir("/embeddings/")]
+EMBEDDING_TOKENS = [x[0] for x in EMBEDDINGS]
+EMBEDDING_PATHS = [x[1] for x in EMBEDDINGS]
+
 
 class KarrasDPM:
     def from_config(config):
@@ -288,6 +292,10 @@ class Predictor(BasePredictor):
             torch_dtype=torch.float16,
         ).to("cuda")
 
+        self.txt2img_pipe.load_textual_inversion(
+            EMBEDDING_PATHS, token=EMBEDDING_TOKENS, local_files_only=True
+        )
+
         print("Loading SD img2img pipeline...")
         self.img2img_pipe = StableDiffusionImg2ImgPipeline(
             vae=self.txt2img_pipe.vae,
@@ -320,7 +328,7 @@ class Predictor(BasePredictor):
         controlnet = ControlNetModel.from_pretrained(
             "lllyasviel/sd-controlnet-openpose",
             torch_dtype=torch.float16,
-            cache_dir="diffusers-cache"
+            cache_dir="diffusers-cache",
         )
 
         print("Loading controlnet txt2img...")
@@ -378,7 +386,8 @@ class Predictor(BasePredictor):
             default="photo of cjw person",
         ),
         negative_prompt: str = Input(
-            description="Specify things to not see in the output",
+            description="Specify things to not see in the output. Supported embeddings: "
+            + ", ".join(EMBEDDING_TOKENS),
             default="",
         ),
         width: int = Input(

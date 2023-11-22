@@ -320,8 +320,7 @@ class Predictor(BasePredictor):
         controlnet = ControlNetModel.from_pretrained(
             "lllyasviel/sd-controlnet-openpose",
             torch_dtype=torch.float16,
-            cache_dir="diffusers-cache",
-            local_files_only=True,
+            cache_dir="diffusers-cache"
         )
 
         print("Loading controlnet txt2img...")

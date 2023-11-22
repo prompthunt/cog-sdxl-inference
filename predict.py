@@ -65,7 +65,7 @@ REFINER_URL = (
 )
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 
-EMBEDDINGS = [(x.split(".")[0], "/embeddings/" + x) for x in os.listdir("/embeddings/")]
+EMBEDDINGS = [(x.split(".")[0], "./embeddings/" + x) for x in os.listdir("./embeddings/")]
 EMBEDDING_TOKENS = [x[0] for x in EMBEDDINGS]
 EMBEDDING_PATHS = [x[1] for x in EMBEDDINGS]
 

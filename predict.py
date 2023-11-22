@@ -447,6 +447,7 @@ class Predictor(BasePredictor):
                 "PNDM",
                 "UniPCMultistep",
                 "KarrasDPM",
+                "DPM++SDEKarras",
             ],
             description="Choose a scheduler.",
         ),

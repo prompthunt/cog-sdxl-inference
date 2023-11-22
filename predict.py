@@ -196,6 +196,23 @@ class Predictor(BasePredictor):
         self.face_analyser = FaceAnalysis(name="buffalo_l")
         self.face_analyser.prepare(ctx_id=0, det_thresh=0.5, det_size=(640, 640))
 
+    def get_face(self, img_data, image_type="target"):
+        try:
+            analysed = self.face_analyser.get(img_data)
+            print(f"face num: {len(analysed)}")
+            if len(analysed) == 0 and image_type == "source":
+                msg = "no face"
+                print(msg)
+                raise Exception(msg)
+            largest = max(
+                analysed,
+                key=lambda x: (x.bbox[2] - x.bbox[0]) * (x.bbox[3] - x.bbox[1]),
+            )
+            return largest
+        except Exception as e:
+            print(str(e))
+            raise Exception(str(e))
+
     # Target image is image to paste into
     # Source image is image to take face from
     def swap_face(self, target_image: Path, source_image: Path) -> Image.Image:

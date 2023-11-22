@@ -65,7 +65,9 @@ REFINER_URL = (
 )
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 
-EMBEDDINGS = [(x.split(".")[0], "./embeddings/" + x) for x in os.listdir("./embeddings/")]
+EMBEDDINGS = [
+    (x.split(".")[0], "./embeddings/" + x) for x in os.listdir("./embeddings/")
+]
 EMBEDDING_TOKENS = [x[0] for x in EMBEDDINGS]
 EMBEDDING_PATHS = [x[1] for x in EMBEDDINGS]
 
@@ -494,8 +496,6 @@ class Predictor(BasePredictor):
             # FIXME(ja): prompt/negative_prompt are sent to the inpainting pipeline
             # because it doesn't support prompt_embeds/negative_prompt_embeds
             extra_kwargs = {
-                "prompt": prompt,
-                "negative_prompt": negative_prompt,
                 "image": image,
                 "mask_image": mask,
                 "strength": prompt_strength,
@@ -518,11 +518,11 @@ class Predictor(BasePredictor):
         print(f"Prompt: {prompt}")
         print(f"Negative Prompt: {negative_prompt}")
 
-        if prompt:
-            print("parsed prompt:", self.compel.parse_prompt_string(prompt))
-            prompt_embeds = self.compel(prompt)
-        else:
-            prompt_embeds = None
+        # if prompt:
+        #     print("parsed prompt:", self.compel.parse_prompt_string(prompt))
+        #     prompt_embeds = self.compel(prompt)
+        # else:
+        #     prompt_embeds = None
 
         if negative_prompt:
             print(
@@ -539,8 +539,10 @@ class Predictor(BasePredictor):
             this_seed = seed + idx
             generator = torch.Generator("cuda").manual_seed(this_seed)
             output = pipe(
-                prompt_embeds=prompt_embeds,
-                negative_prompt_embeds=negative_prompt_embeds,
+                prompt=[prompt] * num_outputs if prompt is not None else None,
+                negative_prompt=[negative_prompt] * num_outputs
+                if negative_prompt is not None
+                else None,
                 guidance_scale=guidance_scale,
                 generator=generator,
                 num_inference_steps=num_inference_steps,

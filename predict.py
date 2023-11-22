@@ -47,7 +47,7 @@ from gfpgan import GFPGANer
 from realesrgan.utils import RealESRGANer
 from basicsr.archs.srvgg_arch import SRVGGNetCompact
 import cv2
-from compel import Compel
+from compel import Compel, DiffusersTextualInversionManager
 from controlnet_aux import OpenposeDetector
 from transformers import CLIPFeatureExtractor
 import insightface
@@ -298,6 +298,15 @@ class Predictor(BasePredictor):
             EMBEDDING_PATHS, token=EMBEDDING_TOKENS, local_files_only=True
         )
 
+        textual_inversion_manager = DiffusersTextualInversionManager(self.txt2img_pipe)
+
+        self.compel_proc = Compel(
+            tokenizer=self.txt2img_pipe.tokenizer,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            textual_inversion_manager=textual_inversion_manager,
+            truncate_long_prompts=False,
+        )
+
         print("Loading SD img2img pipeline...")
         self.img2img_pipe = StableDiffusionImg2ImgPipeline(
             vae=self.txt2img_pipe.vae,
@@ -518,20 +527,19 @@ class Predictor(BasePredictor):
         print(f"Prompt: {prompt}")
         print(f"Negative Prompt: {negative_prompt}")
 
-        # if prompt:
-        #     print("parsed prompt:", self.compel.parse_prompt_string(prompt))
-        #     prompt_embeds = self.compel(prompt)
-        # else:
-        #     prompt_embeds = None
-
-        # if negative_prompt:
-        #     print(
-        #         "parsed negative prompt:",
-        #         self.compel.parse_prompt_string(negative_prompt),
-        #     )
-        #     negative_prompt_embeds = self.compel(negative_prompt)
-        # else:
-        #     negative_prompt_embeds = None
+        if prompt:
+            conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+            if not negative_prompt:
+                negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+            negative_conditioning = self.compel_proc.build_conditioning_tensor(
+                negative_prompt
+            )
+            [
+                prompt_embeds,
+                negative_prompt_embeds,
+            ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+                [conditioning, negative_conditioning]
+            )
 
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 
@@ -539,10 +547,8 @@ class Predictor(BasePredictor):
             this_seed = seed + idx
             generator = torch.Generator("cuda").manual_seed(this_seed)
             output = pipe(
-                prompt=[prompt] * num_outputs if prompt is not None else None,
-                negative_prompt=[negative_prompt] * num_outputs
-                if negative_prompt is not None
-                else None,
+                prompt_embeds=prompt_embeds,
+                negative_prompt_embeds=negative_prompt_embeds,
                 guidance_scale=guidance_scale,
                 generator=generator,
                 num_inference_steps=num_inference_steps,

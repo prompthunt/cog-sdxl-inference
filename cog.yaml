@@ -1,36 +1,30 @@
+# Configuration for Cog
 build:
   gpu: true
   cuda: "11.8"
-  python_version: "3.11.1"
+  python_version: "3.11"
   system_packages:
     - "libgl1-mesa-glx"
     - "ffmpeg"
-    - "libsm6"
-    - "libxext6"
-    - "wget"
+	@@ -12,21 +11,26 @@ build:
     - "cmake"
     - "zip"
   python_packages:
-    - "diffusers==0.17.1"
-    - "torch==1.13.0 --index-url https://download.pytorch.org/whl/cu118"
-    - "transformers==4.25.1"
-    - "ftfy==6.1.1"
-    - "accelerate==0.15.0"
+    - "diffusers"
+    - "torch==2.0.1"
+    - "transformers"
+    - "invisible-watermark"
+    - "accelerate"
     - "pandas"
     - "torchvision"
-    - "safetensors==0.3.3"
+    - "safetensors"
     - "mediapipe"
     - "gfpgan"
     - "realesrgan"
     - "insightface==0.7.3"
     - "onnxruntime-gpu"
-    - "scipy==1.9.3"
 
   run:
-    - apt-get update && apt-get install -y git-lfs && git lfs install && rm -rf /var/lib/apt/lists/*
-    - set -eux; mkdir embeddings/ && cd embeddings/ && wget -O FastNegativeV2.pt "https://civitai.com/api/download/models/94057?type=Model&format=PickleTensor" && wget -O BadDream.pt "https://civitai.com/api/download/models/77169?type=Model&format=PickleTensor" && wget -O UnrealisticDream.pt "https://civitai.com/api/download/models/77173?type=Model&format=PickleTensor" && wget -O EasyNegative.pt "https://civitai.com/api/download/models/9536?type=Model&format=PickleTensor&size=full&fp=fp16" && wget -O ng_deepnegative_v1_75t.pt "https://civitai.com/api/download/models/5637?type=Model&format=PickleTensor&size=full&fp=fp16" && wget -O negative_hand-neg.pt "https://civitai.com/api/download/models/60938?type=Negative&format=Other" && wget -O realisticvision-negative-embedding.pt "https://civitai.com/api/download/models/42247?type=Model&format=Other"
-    - mkdir /safety_checker/ && wget -q -O /safety_checker/model.safetensors "https://huggingface.co/pagebrain/deliberate-v3/resolve/main/safety_checker/model.safetensors?download=true" && wget -q -O /safety_checker/config.json "https://huggingface.co/pagebrain/deliberate-v3/raw/main/safety_checker/config.json" && ls -lsh /safety_checker/
-    - mkdir /feature_extractor/ && wget -q -O /feature_extractor/preprocessor_config.json "https://huggingface.co/pagebrain/deliberate-v3/raw/main/feature_extractor/preprocessor_config.json"
     - curl -o /usr/local/bin/pget -L "https://github.com/replicate/pget/releases/download/v0.0.1/pget" && chmod +x /usr/local/bin/pget
     - wget http://thegiflibrary.tumblr.com/post/11565547760 -O face_landmarker_v2_with_blendshapes.task -q https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
     - pip install git+https://github.com/wiktorlazarski/head-segmentation.git
@@ -40,4 +34,6 @@ build:
     - "wget https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip"
     - "unzip buffalo_l.zip -d ~/.insightface/models/buffalo_l"
     - "pip install git+https://github.com/patrickvonplaten/controlnet_aux.git@dfb604120af6e5acf21936f79aecb046d0faaa29"
+
+
 predict: "predict.py:Predictor"

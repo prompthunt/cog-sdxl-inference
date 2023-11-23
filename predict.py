@@ -340,12 +340,6 @@ class Predictor(BasePredictor):
             feature_extractor=self.txt2img_pipe.feature_extractor,
         ).to("cuda")
 
-        print("Loading compel...")
-        self.compel = Compel(
-            tokenizer=self.txt2img_pipe.tokenizer,
-            text_encoder=self.txt2img_pipe.text_encoder,
-        )
-
         print("Loading controlnet...")
         controlnet = ControlNetModel.from_pretrained(
             "lllyasviel/sd-controlnet-openpose",
@@ -395,6 +389,10 @@ class Predictor(BasePredictor):
             description="Optional Image to use for guidance based on posenet",
             default=None,
         ),
+        pose_image: Path = Input(
+            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+            default=None,
+        ),
         image: Path = Input(
             description="Optional Image to use for img2img guidance",
             default=None,
@@ -423,7 +421,7 @@ class Predictor(BasePredictor):
         num_outputs: int = Input(
             description="Number of images to output.",
             ge=1,
-            le=4,
+            le=40,
             default=1,
         ),
         num_inference_steps: int = Input(
@@ -465,6 +463,10 @@ class Predictor(BasePredictor):
             description="Source image for face swap",
             default=None,
         ),
+        show_debug_images: bool = Input(
+            description="Show debug images",
+            default=False,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
@@ -486,7 +488,9 @@ class Predictor(BasePredictor):
 
         if image:
             image = self.load_image(image)
-        if control_image:
+        if pose_image:
+            control_image = self.load_image(pose_image)
+        elif control_image:
             control_image = self.load_image(control_image)
             control_image = self.process_control(control_image)
         if mask:
@@ -570,7 +574,9 @@ class Predictor(BasePredictor):
             output_path = f"/tmp/seed-{this_seed}.png"
             output.images[0].save(output_path)
             path_to_output = Path(output_path)
-            yield path_to_output
+            # If show_debug_images or is no face swap
+            if show_debug_images or not should_swap_face:
+                yield path_to_output
 
             if should_swap_face:
                 if source_image:

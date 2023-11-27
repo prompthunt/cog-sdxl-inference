@@ -469,15 +469,15 @@ class Predictor(BasePredictor):
         ),
         prompt_2: str = Input(
             description="Input prompt",
-            default="photo of cjw person",
+            default=None,
         ),
         prompt_3: str = Input(
             description="Input prompt",
-            default="photo of cjw person",
+            default=None,
         ),
         prompt_4: str = Input(
             description="Input prompt",
-            default="photo of cjw person",
+            default=None,
         ),
         pose_image_2: Path = Input(
             description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",

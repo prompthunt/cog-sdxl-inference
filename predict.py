@@ -209,7 +209,7 @@ class Predictor(BasePredictor):
         # Use GFPGAN for face enhancement
         self.face_enhancer = GFPGANer(
             model_path="gfpgan/weights/GFPGANv1.4.pth",
-            upscale=2,
+            upscale=1,
             arch="clean",
             channel_multiplier=2,
             bg_upsampler=self.upsampler,

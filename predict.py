@@ -522,10 +522,16 @@ class Predictor(BasePredictor):
 
         if pose_image_2:
             control_image_2 = self.load_image(pose_image_2)
+        else:
+            control_image_2 = None
         if pose_image_3:
             control_image_3 = self.load_image(pose_image_3)
+        else:
+            control_image_3 = None
         if pose_image_4:
             control_image_4 = self.load_image(pose_image_4)
+        else:
+            control_image_4 = None
 
         kwargs = {}
         if control_image and mask:

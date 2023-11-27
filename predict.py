@@ -110,6 +110,18 @@ def download_weights(url, dest):
     print("downloading took: ", time.time() - start)
 
 
+def resize_for_condition_image(input_image: Image, resolution: int):
+    input_image = input_image.convert("RGB")
+    W, H = input_image.size
+    k = float(resolution) / min(H, W)
+    H *= k
+    W *= k
+    H = int(round(H / 64.0)) * 64
+    W = int(round(W / 64.0)) * 64
+    img = input_image.resize((W, H), resample=Image.LANCZOS)
+    return img
+
+
 class Predictor(BasePredictor):
     def upscale_image_pil(self, img: Image.Image) -> Image.Image:
         weight = 0.5
@@ -340,12 +352,30 @@ class Predictor(BasePredictor):
             feature_extractor=self.txt2img_pipe.feature_extractor,
         ).to("cuda")
 
-        print("Loading controlnet...")
+        print("Loading pose controlnet...")
         controlnet = ControlNetModel.from_pretrained(
             "lllyasviel/sd-controlnet-openpose",
             torch_dtype=torch.float16,
             cache_dir="diffusers-cache",
         )
+        print("Loading tile controlnet...")
+        controlnet_tile = ControlNetModel.from_pretrained(
+            "lllyasviel/control_v11f1e_sd15_tile",
+            torch_dtype=torch.float16,
+            cache_dir="diffusers-cache",
+        )
+
+        print("Loading tile pipeline...")
+        self.cnet_tile_pipe = StableDiffusionControlNetPipeline(
+            vae=self.txt2img_pipe.vae,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            tokenizer=self.txt2img_pipe.tokenizer,
+            unet=self.txt2img_pipe.unet,
+            scheduler=self.txt2img_pipe.scheduler,
+            safety_checker=self.txt2img_pipe.safety_checker,
+            feature_extractor=self.txt2img_pipe.feature_extractor,
+            controlnet=controlnet_tile,
+        ).to("cuda")
 
         print("Loading controlnet txt2img...")
         self.cnet_txt2img_pipe = StableDiffusionControlNetPipeline(
@@ -491,6 +521,18 @@ class Predictor(BasePredictor):
             description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
             default=None,
         ),
+        tile_strength: float = Input(
+            description="Tile strength",
+            default=0.2,
+        ),
+        tile_steps: int = Input(
+            description="Tile steps",
+            default=32,
+        ),
+        tile_scale: float = Input(
+            description="Tile scale",
+            default=1.5,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
@@ -635,8 +677,33 @@ class Predictor(BasePredictor):
             output.images[0].save(output_path)
             path_to_output = Path(output_path)
             # If show_debug_images or is no face swap
-            if show_debug_images or not should_swap_face:
-                yield path_to_output
+            yield path_to_output
+
+            # Do tile run
+            source_image = output.images[0]
+            condition_image = resize_for_condition_image(
+                source_image, width * tile_scale
+            )
+
+            tile_output = self.cnet_tile_pipe(
+                prompt_embeds=prompt_embeds,
+                negative_prompt_embeds=negative_prompt_embeds,
+                image=condition_image,
+                controlnet_conditioning_image=condition_image,
+                width=condition_image.size[0],
+                height=condition_image.size[1],
+                strength=tile_strength,
+                generator=torch.manual_seed(0),
+                num_inference_steps=tile_steps,
+            ).images[0]
+
+            # Add output
+            output_path = f"/tmp/seed-tile-{this_seed}.png"
+            tile_output.save(output_path)
+            path_to_output = Path(output_path)
+
+            if show_debug_images:
+                tile_output.save(f"/tmp/seed-tile-{this_seed}.png")
 
             if should_swap_face:
                 if source_image:

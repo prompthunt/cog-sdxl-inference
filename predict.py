@@ -209,7 +209,7 @@ class Predictor(BasePredictor):
         # Use GFPGAN for face enhancement
         self.face_enhancer = GFPGANer(
             model_path="gfpgan/weights/GFPGANv1.4.pth",
-            upscale=1,
+            upscale=2,
             arch="clean",
             channel_multiplier=2,
             bg_upsampler=self.upsampler,
@@ -467,6 +467,30 @@ class Predictor(BasePredictor):
             description="Show debug images",
             default=False,
         ),
+        prompt_2: str = Input(
+            description="Input prompt",
+            default="photo of cjw person",
+        ),
+        prompt_3: str = Input(
+            description="Input prompt",
+            default="photo of cjw person",
+        ),
+        prompt_4: str = Input(
+            description="Input prompt",
+            default="photo of cjw person",
+        ),
+        pose_image_2: Path = Input(
+            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+            default=None,
+        ),
+        pose_image_3: Path = Input(
+            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+            default=None,
+        ),
+        pose_image_4: Path = Input(
+            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+            default=None,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
@@ -496,6 +520,13 @@ class Predictor(BasePredictor):
         if mask:
             mask = self.load_image(mask)
 
+        if pose_image_2:
+            control_image_2 = self.load_image(pose_image_2)
+        if pose_image_3:
+            control_image_3 = self.load_image(pose_image_3)
+        if pose_image_4:
+            control_image_4 = self.load_image(pose_image_4)
+
         kwargs = {}
         if control_image and mask:
             raise ValueError("Cannot use controlnet and inpainting at the same time")
@@ -503,7 +534,7 @@ class Predictor(BasePredictor):
             print("Using ControlNet img2img")
             pipe = self.cnet_img2img_pipe
             extra_kwargs = {
-                "controlnet_conditioning_image": control_image,
+                "control_image": control_image,
                 "image": image,
                 "strength": prompt_strength,
             }
@@ -540,28 +571,51 @@ class Predictor(BasePredictor):
                 "height": height,
             }
 
-        print(f"Prompt: {prompt}")
-        print(f"Negative Prompt: {negative_prompt}")
-
-        if prompt:
-            conditioning = self.compel_proc.build_conditioning_tensor(prompt)
-            if not negative_prompt:
-                negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
-            negative_conditioning = self.compel_proc.build_conditioning_tensor(
-                negative_prompt
-            )
-            [
-                prompt_embeds,
-                negative_prompt_embeds,
-            ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
-                [conditioning, negative_conditioning]
-            )
-
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
+
+        prompts = [prompt, prompt_2, prompt_3, prompt_4]
+        # Remove non existent prompts
+        prompts = [x for x in prompts if x]
+
+        control_images = [
+            control_image,
+            control_image_2,
+            control_image_3,
+            control_image_4,
+        ]
+        # Remove non existent control images
+        control_images = [x for x in control_images if x]
 
         for idx in range(num_outputs):
             this_seed = seed + idx
             generator = torch.Generator("cuda").manual_seed(this_seed)
+            print(f"Prompt: {prompt}")
+            print(f"Negative Prompt: {negative_prompt}")
+
+            # Pick a prompt round robin
+            prompt = prompts[idx % len(prompts)]
+
+            if prompt:
+                conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+                if not negative_prompt:
+                    negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+                negative_conditioning = self.compel_proc.build_conditioning_tensor(
+                    negative_prompt
+                )
+                [
+                    prompt_embeds,
+                    negative_prompt_embeds,
+                ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+                    [conditioning, negative_conditioning]
+                )
+
+            if control_image and image:
+                control_image = control_images[idx % len(control_images)]
+                extra_kwargs["control_image"] = control_image
+            elif control_image:
+                control_image = control_images[idx % len(control_images)]
+                extra_kwargs["image"] = control_image
+
             output = pipe(
                 prompt_embeds=prompt_embeds,
                 negative_prompt_embeds=negative_prompt_embeds,

@@ -186,7 +186,6 @@ class Predictor(BasePredictor):
         self.feature_extractor = CLIPFeatureExtractor.from_pretrained(
             "openai/clip-vit-base-patch32"
         )
-        self.url = None
 
         if not os.path.exists("gfpgan/weights/realesr-general-x4v3.pth"):
             os.system(
@@ -279,36 +278,54 @@ class Predictor(BasePredictor):
         return load_image("/tmp/image.png").convert("RGB")
 
     def download_zip_weights_python(self, url):
-        """Download the model weights from the given URL"""
         print("Downloading weights...")
 
-        if os.path.exists("weights"):
-            shutil.rmtree("weights")
-        os.makedirs("weights")
+        # Generate a hash value from the URL
+        url_hash = hashlib.md5(url.encode()).hexdigest()
+        hash_folder = os.path.join("weights", url_hash)
 
-        import zipfile
-        from io import BytesIO
-        import urllib.request
+        # Check if the folder already exists and has contents
+        if os.path.exists(hash_folder) and os.listdir(hash_folder):
+            print("Weights already downloaded.")
+            return
+        else:
+            # Remove the folder if it exists and is empty, then recreate it
+            if os.path.exists(hash_folder):
+                shutil.rmtree(hash_folder)
+            os.makedirs(hash_folder)
 
-        url = urllib.request.urlopen(url)
-        with zipfile.ZipFile(BytesIO(url.read())) as zf:
-            zf.extractall("weights")
+            import zipfile
+            from io import BytesIO
+            import urllib.request
+
+            # Download and extract the weights
+            url_response = urllib.request.urlopen(url)
+            with zipfile.ZipFile(BytesIO(url_response.read())) as zf:
+                zf.extractall(hash_folder)
+            print("Weights downloaded and saved in:", hash_folder)
 
     def load_weights(self, url):
         """Load the model into memory to make running multiple predictions efficient"""
-        print("Loading Safety pipeline...")
 
-        if url == self.url:
-            return
+        # Release resources held by existing pipeline objects
+        self.txt2img_pipe = None
+        self.img2img_pipe = None
+        self.inpaint_pipe = None
+        self.cnet_tile_pipe = None
+        self.cnet_txt2img_pipe = None
+        self.cnet_img2img_pipe = None
+        torch.cuda.empty_cache()  # Clear GPU cache if using CUDA
 
         start_time = time.time()
-        self.download_zip_weights_python(url)
+        weights_folder = self.download_zip_weights_python(
+            url
+        )  # This now returns the folder path
         print("Downloaded weights in {:.2f} seconds".format(time.time() - start_time))
 
         start_time = time.time()
         print("Loading SD pipeline...")
         self.txt2img_pipe = StableDiffusionPipeline.from_pretrained(
-            "weights",
+            weights_folder,
             safety_checker=None,
             feature_extractor=self.feature_extractor,
             torch_dtype=torch.float16,
@@ -400,11 +417,6 @@ class Predictor(BasePredictor):
         )
 
         print("Loaded pipelines in {:.2f} seconds".format(time.time() - start_time))
-
-        # self.txt2img_pipe.set_progress_bar_config(disable=True)
-        # self.img2img_pipe.set_progress_bar_config(disable=True)
-        # self.inpaint_pipe.set_progress_bar_config(disable=True)
-        self.url = url
 
     @torch.inference_mode()
     def predict(

@@ -287,7 +287,7 @@ class Predictor(BasePredictor):
         # Check if the folder already exists and has contents
         if os.path.exists(hash_folder) and os.listdir(hash_folder):
             print("Weights already downloaded.")
-            return
+            return hash_folder
         else:
             # Remove the folder if it exists and is empty, then recreate it
             if os.path.exists(hash_folder):
@@ -303,6 +303,9 @@ class Predictor(BasePredictor):
             with zipfile.ZipFile(BytesIO(url_response.read())) as zf:
                 zf.extractall(hash_folder)
             print("Weights downloaded and saved in:", hash_folder)
+
+        return hash_folder
+
 
     def load_weights(self, url):
         """Load the model into memory to make running multiple predictions efficient"""

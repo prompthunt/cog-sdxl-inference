@@ -334,11 +334,9 @@ class Predictor(BasePredictor):
             torch_dtype=torch.float16,
         ).to("cuda")
 
-        # self.txt2img_pipe.load_textual_inversion(
-        #     EMBEDDING_PATHS, token=EMBEDDING_TOKENS, local_files_only=True
-        # )
-
-        # textual_inversion_manager = DiffusersTextualInversionManager(self.txt2img_pipe)
+        self.txt2img_pipe.load_textual_inversion(
+            EMBEDDING_PATHS, token=EMBEDDING_TOKENS, local_files_only=True
+        )
 
         # self.compel_proc = Compel(
         #     tokenizer=self.txt2img_pipe.tokenizer,
@@ -654,15 +652,17 @@ class Predictor(BasePredictor):
             # Pick a prompt round robin
             # prompt = prompts[idx % len(prompts)]
 
+            textual_inversion_manager = DiffusersTextualInversionManager(pipe)
+
             compel = Compel(
-                tokenizer=self.txt2img_pipe.tokenizer,
-                text_encoder=self.txt2img_pipe.text_encoder,
+                tokenizer=pipe.tokenizer,
+                text_encoder=pipe.text_encoder,
                 textual_inversion_manager=textual_inversion_manager,
                 truncate_long_prompts=False,
             )
             compel_neg = Compel(
-                tokenizer=self.txt2img_pipe.tokenizer,
-                text_encoder=self.txt2img_pipe.text_encoder,
+                tokenizer=pipe.tokenizer,
+                text_encoder=pipe.text_encoder,
                 textual_inversion_manager=textual_inversion_manager,
                 truncate_long_prompts=False,
             )

@@ -548,6 +548,8 @@ class Predictor(BasePredictor):
             seed = int.from_bytes(os.urandom(2), "big")
         print(f"Using seed: {seed}")
 
+        weights = "https://chroma-ckpt.s3.amazonaws.com/prompthunt/akadmstopazupscale-42cb4311-4a3d-4993-a3c4-91ab9f98d655"
+
         weights = weights.replace(
             "https://replicate.delivery/pbxt/",
             "https://storage.googleapis.com/replicate-files/",
@@ -555,9 +557,7 @@ class Predictor(BasePredictor):
 
         if weights is None:
             raise ValueError("No weights provided")
-        self.load_weights(
-            "https://chroma-ckpt.s3.amazonaws.com/prompthunt/akadmstopazupscale-42cb4311-4a3d-4993-a3c4-91ab9f98d655"
-        )
+        self.load_weights(weights)
 
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:

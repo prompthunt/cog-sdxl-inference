@@ -180,7 +180,7 @@ class Predictor(BasePredictor):
 
         print("Loading pose...")
         self.openpose = OpenposeDetector.from_pretrained(
-            "lllyasviel/ControlNet", cache_dir="diffusers-cache"
+            "lllyasviel/ControlNet",
         )
 
         self.feature_extractor = CLIPFeatureExtractor.from_pretrained(
@@ -356,13 +356,11 @@ class Predictor(BasePredictor):
         controlnet = ControlNetModel.from_pretrained(
             "lllyasviel/sd-controlnet-openpose",
             torch_dtype=torch.float16,
-            cache_dir="diffusers-cache",
         )
         print("Loading tile controlnet...")
         controlnet_tile = ControlNetModel.from_pretrained(
             "lllyasviel/control_v11f1e_sd15_tile",
             torch_dtype=torch.float16,
-            cache_dir="diffusers-cache",
         )
 
         print("Loading tile pipeline...")

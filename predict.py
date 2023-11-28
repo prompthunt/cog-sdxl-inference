@@ -178,60 +178,60 @@ class Predictor(BasePredictor):
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
 
-        print("Loading pose...")
-        self.openpose = OpenposeDetector.from_pretrained(
-            "lllyasviel/ControlNet",
-        )
+        # print("Loading pose...")
+        # self.openpose = OpenposeDetector.from_pretrained(
+        #     "lllyasviel/ControlNet",
+        # )
 
         self.feature_extractor = CLIPFeatureExtractor.from_pretrained(
             "openai/clip-vit-base-patch32"
         )
 
-        if not os.path.exists("gfpgan/weights/realesr-general-x4v3.pth"):
-            os.system(
-                "wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth -P ./gfpgan/weights"
-            )
-        if not os.path.exists("gfpgan/weights/GFPGANv1.4.pth"):
-            os.system(
-                "wget https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth -P ./gfpgan/weights"
-            )
+        # if not os.path.exists("gfpgan/weights/realesr-general-x4v3.pth"):
+        #     os.system(
+        #         "wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth -P ./gfpgan/weights"
+        #     )
+        # if not os.path.exists("gfpgan/weights/GFPGANv1.4.pth"):
+        #     os.system(
+        #         "wget https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth -P ./gfpgan/weights"
+        #     )
 
-        # background enhancer with RealESRGAN
-        model = SRVGGNetCompact(
-            num_in_ch=3,
-            num_out_ch=3,
-            num_feat=64,
-            num_conv=32,
-            upscale=4,
-            act_type="prelu",
-        )
-        model_path = "gfpgan/weights/realesr-general-x4v3.pth"
-        half = True if torch.cuda.is_available() else False
-        self.upsampler = RealESRGANer(
-            scale=2,
-            model_path=model_path,
-            model=model,
-            tile=0,
-            tile_pad=10,
-            pre_pad=0,
-            half=half,
-        )
+        # # background enhancer with RealESRGAN
+        # model = SRVGGNetCompact(
+        #     num_in_ch=3,
+        #     num_out_ch=3,
+        #     num_feat=64,
+        #     num_conv=32,
+        #     upscale=4,
+        #     act_type="prelu",
+        # )
+        # model_path = "gfpgan/weights/realesr-general-x4v3.pth"
+        # half = True if torch.cuda.is_available() else False
+        # self.upsampler = RealESRGANer(
+        #     scale=2,
+        #     model_path=model_path,
+        #     model=model,
+        #     tile=0,
+        #     tile_pad=10,
+        #     pre_pad=0,
+        #     half=half,
+        # )
 
-        # Use GFPGAN for face enhancement
-        self.face_enhancer = GFPGANer(
-            model_path="gfpgan/weights/GFPGANv1.4.pth",
-            upscale=1,
-            arch="clean",
-            channel_multiplier=2,
-            bg_upsampler=self.upsampler,
-        )
-        self.current_version = "v1.4"
+        # # Use GFPGAN for face enhancement
+        # self.face_enhancer = GFPGANer(
+        #     model_path="gfpgan/weights/GFPGANv1.4.pth",
+        #     upscale=1,
+        #     arch="clean",
+        #     channel_multiplier=2,
+        #     bg_upsampler=self.upsampler,
+        # )
+        # self.current_version = "v1.4"
 
-        self.face_swapper = insightface.model_zoo.get_model(
-            "cache/inswapper_128.onnx", providers=onnxruntime.get_available_providers()
-        )
-        self.face_analyser = FaceAnalysis(name="buffalo_l")
-        self.face_analyser.prepare(ctx_id=0, det_thresh=0.5, det_size=(640, 640))
+        # self.face_swapper = insightface.model_zoo.get_model(
+        #     "cache/inswapper_128.onnx", providers=onnxruntime.get_available_providers()
+        # )
+        # self.face_analyser = FaceAnalysis(name="buffalo_l")
+        # self.face_analyser.prepare(ctx_id=0, det_thresh=0.5, det_size=(640, 640))
 
     def get_face(self, img_data, image_type="target"):
         try:
@@ -306,17 +306,16 @@ class Predictor(BasePredictor):
 
         return hash_folder
 
-
     def load_weights(self, url):
         """Load the model into memory to make running multiple predictions efficient"""
 
         # Release resources held by existing pipeline objects
         self.txt2img_pipe = None
-        self.img2img_pipe = None
-        self.inpaint_pipe = None
-        self.cnet_tile_pipe = None
-        self.cnet_txt2img_pipe = None
-        self.cnet_img2img_pipe = None
+        # self.img2img_pipe = None
+        # self.inpaint_pipe = None
+        # self.cnet_tile_pipe = None
+        # self.cnet_txt2img_pipe = None
+        # self.cnet_img2img_pipe = None
         torch.cuda.empty_cache()  # Clear GPU cache if using CUDA
 
         start_time = time.time()
@@ -334,100 +333,97 @@ class Predictor(BasePredictor):
             torch_dtype=torch.float16,
         ).to("cuda")
 
-        self.txt2img_pipe.load_textual_inversion(
-            EMBEDDING_PATHS, token=EMBEDDING_TOKENS, local_files_only=True
-        )
+        # self.txt2img_pipe.load_textual_inversion(
+        #     EMBEDDING_PATHS, token=EMBEDDING_TOKENS, local_files_only=True
+        # )
 
-        # https://huggingface.co/docs/diffusers/using-diffusers/weighted_prompts#textual-inversion
-        # https://pypi.org/project/compel/ check out Textual Inversion support
+        # textual_inversion_manager = DiffusersTextualInversionManager(self.txt2img_pipe)
 
-        textual_inversion_manager = DiffusersTextualInversionManager(self.txt2img_pipe)
+        # self.compel_proc = Compel(
+        #     tokenizer=self.txt2img_pipe.tokenizer,
+        #     text_encoder=self.txt2img_pipe.text_encoder,
+        #     textual_inversion_manager=textual_inversion_manager,
+        #     truncate_long_prompts=False,
+        # )
 
-        self.compel_proc = Compel(
-            tokenizer=self.txt2img_pipe.tokenizer,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            textual_inversion_manager=textual_inversion_manager,
-            truncate_long_prompts=False,
-        )
+        # print("Loading SD img2img pipeline...")
+        # self.img2img_pipe = StableDiffusionImg2ImgPipeline(
+        #     vae=self.txt2img_pipe.vae,
+        #     text_encoder=self.txt2img_pipe.text_encoder,
+        #     tokenizer=self.txt2img_pipe.tokenizer,
+        #     unet=self.txt2img_pipe.unet,
+        #     scheduler=self.txt2img_pipe.scheduler,
+        #     safety_checker=self.txt2img_pipe.safety_checker,
+        #     feature_extractor=self.txt2img_pipe.feature_extractor,
+        # ).to("cuda")
 
-        print("Loading SD img2img pipeline...")
-        self.img2img_pipe = StableDiffusionImg2ImgPipeline(
-            vae=self.txt2img_pipe.vae,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            tokenizer=self.txt2img_pipe.tokenizer,
-            unet=self.txt2img_pipe.unet,
-            scheduler=self.txt2img_pipe.scheduler,
-            safety_checker=self.txt2img_pipe.safety_checker,
-            feature_extractor=self.txt2img_pipe.feature_extractor,
-        ).to("cuda")
+        # print("Loading SD inpaint pipeline...")
+        # self.inpaint_pipe = StableDiffusionInpaintPipeline(
+        #     vae=self.txt2img_pipe.vae,
+        #     text_encoder=self.txt2img_pipe.text_encoder,
+        #     tokenizer=self.txt2img_pipe.tokenizer,
+        #     unet=self.txt2img_pipe.unet,
+        #     scheduler=self.txt2img_pipe.scheduler,
+        #     safety_checker=self.txt2img_pipe.safety_checker,
+        #     feature_extractor=self.txt2img_pipe.feature_extractor,
+        # ).to("cuda")
 
-        print("Loading SD inpaint pipeline...")
-        self.inpaint_pipe = StableDiffusionInpaintPipeline(
-            vae=self.txt2img_pipe.vae,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            tokenizer=self.txt2img_pipe.tokenizer,
-            unet=self.txt2img_pipe.unet,
-            scheduler=self.txt2img_pipe.scheduler,
-            safety_checker=self.txt2img_pipe.safety_checker,
-            feature_extractor=self.txt2img_pipe.feature_extractor,
-        ).to("cuda")
+        # print("Loading pose controlnet...")
+        # controlnet = ControlNetModel.from_pretrained(
+        #     "lllyasviel/sd-controlnet-openpose",
+        #     torch_dtype=torch.float16,
+        # )
+        # print("Loading tile controlnet...")
+        # controlnet_tile = ControlNetModel.from_pretrained(
+        #     "lllyasviel/control_v11f1e_sd15_tile",
+        #     torch_dtype=torch.float16,
+        # )
 
-        print("Loading pose controlnet...")
-        controlnet = ControlNetModel.from_pretrained(
-            "lllyasviel/sd-controlnet-openpose",
-            torch_dtype=torch.float16,
-        )
-        print("Loading tile controlnet...")
-        controlnet_tile = ControlNetModel.from_pretrained(
-            "lllyasviel/control_v11f1e_sd15_tile",
-            torch_dtype=torch.float16,
-        )
+        # print("Loading tile pipeline...")
+        # self.cnet_tile_pipe = StableDiffusionControlNetImg2ImgPipeline(
+        #     vae=self.txt2img_pipe.vae,
+        #     text_encoder=self.txt2img_pipe.text_encoder,
+        #     tokenizer=self.txt2img_pipe.tokenizer,
+        #     unet=self.txt2img_pipe.unet,
+        #     scheduler=self.txt2img_pipe.scheduler,
+        #     safety_checker=self.txt2img_pipe.safety_checker,
+        #     feature_extractor=self.txt2img_pipe.feature_extractor,
+        #     controlnet=controlnet_tile,
+        # ).to("cuda")
 
-        print("Loading tile pipeline...")
-        self.cnet_tile_pipe = StableDiffusionControlNetImg2ImgPipeline(
-            vae=self.txt2img_pipe.vae,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            tokenizer=self.txt2img_pipe.tokenizer,
-            unet=self.txt2img_pipe.unet,
-            scheduler=self.txt2img_pipe.scheduler,
-            safety_checker=self.txt2img_pipe.safety_checker,
-            feature_extractor=self.txt2img_pipe.feature_extractor,
-            controlnet=controlnet_tile,
-        ).to("cuda")
+        # print("Loading controlnet txt2img...")
+        # self.cnet_txt2img_pipe = StableDiffusionControlNetPipeline(
+        #     vae=self.txt2img_pipe.vae,
+        #     text_encoder=self.txt2img_pipe.text_encoder,
+        #     tokenizer=self.txt2img_pipe.tokenizer,
+        #     unet=self.txt2img_pipe.unet,
+        #     scheduler=self.txt2img_pipe.scheduler,
+        #     safety_checker=self.txt2img_pipe.safety_checker,
+        #     feature_extractor=self.txt2img_pipe.feature_extractor,
+        #     controlnet=controlnet,
+        # ).to("cuda")
 
-        print("Loading controlnet txt2img...")
-        self.cnet_txt2img_pipe = StableDiffusionControlNetPipeline(
-            vae=self.txt2img_pipe.vae,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            tokenizer=self.txt2img_pipe.tokenizer,
-            unet=self.txt2img_pipe.unet,
-            scheduler=self.txt2img_pipe.scheduler,
-            safety_checker=self.txt2img_pipe.safety_checker,
-            feature_extractor=self.txt2img_pipe.feature_extractor,
-            controlnet=controlnet,
-        ).to("cuda")
-
-        print("Loading controlnet img2img...")
-        self.cnet_img2img_pipe = StableDiffusionControlNetImg2ImgPipeline(
-            vae=self.txt2img_pipe.vae,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            tokenizer=self.txt2img_pipe.tokenizer,
-            unet=self.txt2img_pipe.unet,
-            scheduler=self.txt2img_pipe.scheduler,
-            safety_checker=self.txt2img_pipe.safety_checker,
-            feature_extractor=self.txt2img_pipe.feature_extractor,
-            controlnet=controlnet,
-        )
+        # print("Loading controlnet img2img...")
+        # self.cnet_img2img_pipe = StableDiffusionControlNetImg2ImgPipeline(
+        #     vae=self.txt2img_pipe.vae,
+        #     text_encoder=self.txt2img_pipe.text_encoder,
+        #     tokenizer=self.txt2img_pipe.tokenizer,
+        #     unet=self.txt2img_pipe.unet,
+        #     scheduler=self.txt2img_pipe.scheduler,
+        #     safety_checker=self.txt2img_pipe.safety_checker,
+        #     feature_extractor=self.txt2img_pipe.feature_extractor,
+        #     controlnet=controlnet,
+        # )
 
         print("Loaded pipelines in {:.2f} seconds".format(time.time() - start_time))
 
     @torch.inference_mode()
     def predict(
         self,
-        weights: str = Input(
-            description="Weights url",
-            default=None,
-        ),
+        # weights: str = Input(
+        #     description="Weights url",
+        #     default=None,
+        # ),
         control_image: Path = Input(
             description="Optional Image to use for guidance based on posenet",
             default=None,
@@ -559,93 +555,95 @@ class Predictor(BasePredictor):
 
         if weights is None:
             raise ValueError("No weights provided")
-        self.load_weights(weights)
+        self.load_weights(
+            "https://chroma-ckpt.s3.amazonaws.com/prompthunt/akadmstopazupscale-42cb4311-4a3d-4993-a3c4-91ab9f98d655"
+        )
 
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:
             self.txt2img_pipe.vae.to(dtype=torch.float16)
 
-        if image:
-            image = self.load_image(image)
-        if pose_image:
-            control_image = self.load_image(pose_image)
-        elif control_image:
-            control_image = self.load_image(control_image)
-            control_image = self.process_control(control_image)
-        if mask:
-            mask = self.load_image(mask)
+        # if image:
+        #     image = self.load_image(image)
+        # if pose_image:
+        #     control_image = self.load_image(pose_image)
+        # elif control_image:
+        #     control_image = self.load_image(control_image)
+        #     control_image = self.process_control(control_image)
+        # if mask:
+        #     mask = self.load_image(mask)
 
-        if pose_image_2:
-            control_image_2 = self.load_image(pose_image_2)
-        else:
-            control_image_2 = None
-        if pose_image_3:
-            control_image_3 = self.load_image(pose_image_3)
-        else:
-            control_image_3 = None
-        if pose_image_4:
-            control_image_4 = self.load_image(pose_image_4)
-        else:
-            control_image_4 = None
+        # if pose_image_2:
+        #     control_image_2 = self.load_image(pose_image_2)
+        # else:
+        #     control_image_2 = None
+        # if pose_image_3:
+        #     control_image_3 = self.load_image(pose_image_3)
+        # else:
+        #     control_image_3 = None
+        # if pose_image_4:
+        #     control_image_4 = self.load_image(pose_image_4)
+        # else:
+        #     control_image_4 = None
 
         kwargs = {}
-        if control_image and mask:
-            raise ValueError("Cannot use controlnet and inpainting at the same time")
-        elif control_image and image:
-            print("Using ControlNet img2img")
-            pipe = self.cnet_img2img_pipe
-            extra_kwargs = {
-                "control_image": control_image,
-                "image": image,
-                "strength": prompt_strength,
-            }
-        elif control_image:
-            print("Using ControlNet txt2img")
-            pipe = self.cnet_txt2img_pipe
-            extra_kwargs = {
-                "image": control_image,
-                "width": width,
-                "height": height,
-            }
-        elif image and mask:
-            print("Using inpaint pipeline")
-            pipe = self.inpainting_pipe
-            # FIXME(ja): prompt/negative_prompt are sent to the inpainting pipeline
-            # because it doesn't support prompt_embeds/negative_prompt_embeds
-            extra_kwargs = {
-                "image": image,
-                "mask_image": mask,
-                "strength": prompt_strength,
-            }
-        elif image:
-            print("Using img2img pipeline")
-            pipe = self.img2img_pipe
-            extra_kwargs = {
-                "image": image,
-                "strength": prompt_strength,
-            }
-        else:
-            print("Using txt2img pipeline")
-            pipe = self.txt2img_pipe
-            extra_kwargs = {
-                "width": width,
-                "height": height,
-            }
+        # if control_image and mask:
+        #     raise ValueError("Cannot use controlnet and inpainting at the same time")
+        # elif control_image and image:
+        #     print("Using ControlNet img2img")
+        #     pipe = self.cnet_img2img_pipe
+        #     extra_kwargs = {
+        #         "control_image": control_image,
+        #         "image": image,
+        #         "strength": prompt_strength,
+        #     }
+        # elif control_image:
+        #     print("Using ControlNet txt2img")
+        #     pipe = self.cnet_txt2img_pipe
+        #     extra_kwargs = {
+        #         "image": control_image,
+        #         "width": width,
+        #         "height": height,
+        #     }
+        # elif image and mask:
+        #     print("Using inpaint pipeline")
+        #     pipe = self.inpainting_pipe
+        #     # FIXME(ja): prompt/negative_prompt are sent to the inpainting pipeline
+        #     # because it doesn't support prompt_embeds/negative_prompt_embeds
+        #     extra_kwargs = {
+        #         "image": image,
+        #         "mask_image": mask,
+        #         "strength": prompt_strength,
+        #     }
+        # elif image:
+        #     print("Using img2img pipeline")
+        #     pipe = self.img2img_pipe
+        #     extra_kwargs = {
+        #         "image": image,
+        #         "strength": prompt_strength,
+        #     }
+        # else:
+        print("Using txt2img pipeline")
+        pipe = self.txt2img_pipe
+        extra_kwargs = {
+            "width": width,
+            "height": height,
+        }
 
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 
-        prompts = [prompt, prompt_2, prompt_3, prompt_4]
+        # prompts = [prompt, prompt_2, prompt_3, prompt_4]
         # Remove non existent prompts
-        prompts = [x for x in prompts if x]
+        # prompts = [x for x in prompts if x]
 
-        control_images = [
-            control_image,
-            control_image_2,
-            control_image_3,
-            control_image_4,
-        ]
+        # control_images = [
+        #     control_image,
+        #     control_image_2,
+        #     control_image_3,
+        #     control_image_4,
+        # ]
         # Remove non existent control images
-        control_images = [x for x in control_images if x]
+        # control_images = [x for x in control_images if x]
 
         for idx in range(num_outputs):
             this_seed = seed + idx
@@ -654,32 +652,38 @@ class Predictor(BasePredictor):
             print(f"Negative Prompt: {negative_prompt}")
 
             # Pick a prompt round robin
-            prompt = prompts[idx % len(prompts)]
+            # prompt = prompts[idx % len(prompts)]
 
-            if prompt:
-                conditioning = self.compel_proc.build_conditioning_tensor(prompt)
-                if not negative_prompt:
-                    negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
-                negative_conditioning = self.compel_proc.build_conditioning_tensor(
-                    negative_prompt
-                )
-                [
-                    prompt_embeds,
-                    negative_prompt_embeds,
-                ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
-                    [conditioning, negative_conditioning]
-                )
+            # self.compel_proc = Compel(
+            #     tokenizer=self.txt2img_pipe.tokenizer,
+            #     text_encoder=self.txt2img_pipe.text_encoder,
+            #     textual_inversion_manager=textual_inversion_manager,
+            #     truncate_long_prompts=False,
+            # )
+            # if prompt:
+            #     conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+            #     if not negative_prompt:
+            #         negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+            #     negative_conditioning = self.compel_proc.build_conditioning_tensor(
+            #         negative_prompt
+            #     )
+            #     [
+            #         prompt_embeds,
+            #         negative_prompt_embeds,
+            #     ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+            #         [conditioning, negative_conditioning]
+            #     )
 
-            if control_image and image:
-                control_image = control_images[idx % len(control_images)]
-                extra_kwargs["control_image"] = control_image
-            elif control_image:
-                control_image = control_images[idx % len(control_images)]
-                extra_kwargs["image"] = control_image
+            # if control_image and image:
+            #     control_image = control_images[idx % len(control_images)]
+            #     extra_kwargs["control_image"] = control_image
+            # elif control_image:
+            #     control_image = control_images[idx % len(control_images)]
+            #     extra_kwargs["image"] = control_image
 
             output = pipe(
-                prompt_embeds=prompt_embeds,
-                negative_prompt_embeds=negative_prompt_embeds,
+                prompt=prompt,
+                negative_prompt=negative_prompt,
                 guidance_scale=guidance_scale,
                 generator=generator,
                 num_inference_steps=num_inference_steps,
@@ -689,42 +693,41 @@ class Predictor(BasePredictor):
             output_path = f"/tmp/seed-{this_seed}.png"
             output.images[0].save(output_path)
             path_to_output = Path(output_path)
-            # If show_debug_images or is no face swap
             yield path_to_output
 
-            # Do tile run
-            source_image_tile = output.images[0]
-            condition_image_tile = resize_for_condition_image(
-                source_image_tile, width * tile_scale
-            )
+            # # Do tile run
+            # source_image_tile = output.images[0]
+            # condition_image_tile = resize_for_condition_image(
+            #     source_image_tile, width * tile_scale
+            # )
 
-            tile_output = self.cnet_tile_pipe(
-                prompt_embeds=prompt_embeds,
-                negative_prompt_embeds=negative_prompt_embeds,
-                image=condition_image_tile,
-                control_image=condition_image_tile,
-                width=condition_image_tile.size[0],
-                height=condition_image_tile.size[1],
-                strength=tile_strength,
-                generator=torch.manual_seed(0),
-                num_inference_steps=tile_steps,
-            ).images[0]
+            # tile_output = self.cnet_tile_pipe(
+            #     prompt_embeds=prompt_embeds,
+            #     negative_prompt_embeds=negative_prompt_embeds,
+            #     image=condition_image_tile,
+            #     control_image=condition_image_tile,
+            #     width=condition_image_tile.size[0],
+            #     height=condition_image_tile.size[1],
+            #     strength=tile_strength,
+            #     generator=torch.manual_seed(0),
+            #     num_inference_steps=tile_steps,
+            # ).images[0]
 
             # Add output
-            output_path = f"/tmp/seed-tile-{this_seed}.png"
-            tile_output.save(output_path)
-            path_to_output = Path(output_path)
-            yield path_to_output
+            # output_path = f"/tmp/seed-tile-{this_seed}.png"
+            # tile_output.save(output_path)
+            # path_to_output = Path(output_path)
+            # yield path_to_output
 
-            tile_output.save(f"/tmp/seed-tile-{this_seed}.png")
+            # tile_output.save(f"/tmp/seed-tile-{this_seed}.png")
 
-            if should_swap_face:
-                if source_image:
-                    # Swap all faces in first pass images
-                    output_path = f"/tmp/seed-swapped-{this_seed}.png"
-                    swapped_image = self.swap_face(path_to_output, source_image)
-                    swapped_image.save(output_path)
-                    path_to_output = Path(output_path)
-                    yield path_to_output
-                else:
-                    print("No source image provided, skipping face swap")
+            # if should_swap_face:
+            #     if source_image:
+            #         # Swap all faces in first pass images
+            #         output_path = f"/tmp/seed-swapped-{this_seed}.png"
+            #         swapped_image = self.swap_face(path_to_output, source_image)
+            #         swapped_image.save(output_path)
+            #         path_to_output = Path(output_path)
+            #         yield path_to_output
+            #     else:
+            #         print("No source image provided, skipping face swap")

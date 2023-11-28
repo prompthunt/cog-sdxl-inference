@@ -339,12 +339,11 @@ class Predictor(BasePredictor):
 
         # textual_inversion_manager = DiffusersTextualInversionManager(self.txt2img_pipe)
 
-        # self.compel_proc = Compel(
-        #     tokenizer=self.txt2img_pipe.tokenizer,
-        #     text_encoder=self.txt2img_pipe.text_encoder,
-        #     textual_inversion_manager=textual_inversion_manager,
-        #     truncate_long_prompts=False,
-        # )
+        self.compel_proc = Compel(
+            tokenizer=self.txt2img_pipe.tokenizer,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            truncate_long_prompts=False,
+        )
 
         # print("Loading SD img2img pipeline...")
         # self.img2img_pipe = StableDiffusionImg2ImgPipeline(
@@ -660,19 +659,19 @@ class Predictor(BasePredictor):
             #     textual_inversion_manager=textual_inversion_manager,
             #     truncate_long_prompts=False,
             # )
-            # if prompt:
-            #     conditioning = self.compel_proc.build_conditioning_tensor(prompt)
-            #     if not negative_prompt:
-            #         negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
-            #     negative_conditioning = self.compel_proc.build_conditioning_tensor(
-            #         negative_prompt
-            #     )
-            #     [
-            #         prompt_embeds,
-            #         negative_prompt_embeds,
-            #     ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
-            #         [conditioning, negative_conditioning]
-            #     )
+            if prompt:
+                conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+                if not negative_prompt:
+                    negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+                negative_conditioning = self.compel_proc.build_conditioning_tensor(
+                    negative_prompt
+                )
+                [
+                    prompt_embeds,
+                    negative_prompt_embeds,
+                ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+                    [conditioning, negative_conditioning]
+                )
 
             # if control_image and image:
             #     control_image = control_images[idx % len(control_images)]
@@ -682,8 +681,8 @@ class Predictor(BasePredictor):
             #     extra_kwargs["image"] = control_image
 
             output = pipe(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
+                prompt_embeds=prompt_embeds,
+                negative_prompt_embeds=negative_prompt_embeds,
                 guidance_scale=guidance_scale,
                 generator=generator,
                 num_inference_steps=num_inference_steps,

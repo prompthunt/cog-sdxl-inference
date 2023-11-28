@@ -53,6 +53,7 @@ from transformers import CLIPFeatureExtractor
 import insightface
 import onnxruntime
 from insightface.app import FaceAnalysis
+from prompt_parser import get_embed_new
 
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
@@ -339,11 +340,11 @@ class Predictor(BasePredictor):
 
         # textual_inversion_manager = DiffusersTextualInversionManager(self.txt2img_pipe)
 
-        self.compel_proc = Compel(
-            tokenizer=self.txt2img_pipe.tokenizer,
-            text_encoder=self.txt2img_pipe.text_encoder,
-            truncate_long_prompts=False,
-        )
+        # self.compel_proc = Compel(
+        #     tokenizer=self.txt2img_pipe.tokenizer,
+        #     text_encoder=self.txt2img_pipe.text_encoder,
+        #     truncate_long_prompts=False,
+        # )
 
         # print("Loading SD img2img pipeline...")
         # self.img2img_pipe = StableDiffusionImg2ImgPipeline(
@@ -672,9 +673,14 @@ class Predictor(BasePredictor):
             #     ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
             #         [conditioning, negative_conditioning]
             #     )
-            [prompt_embeds, negative_prompt_embeds] = self.compel_proc(
-                [prompt, negative_prompt]
+            compel = Compel(
+                tokenizer=pipe.tokenizer,
+                text_encoder=pipe.text_encoder,
+                truncate_long_prompts=False,
             )
+
+            prompt_emb = get_embed_new(prompt, pipe, compel)
+            negative_prompt_emb = get_embed_new(negative_prompt, pipe, compel)
 
             # if control_image and image:
             #     control_image = control_images[idx % len(control_images)]
@@ -684,8 +690,8 @@ class Predictor(BasePredictor):
             #     extra_kwargs["image"] = control_image
 
             output = pipe(
-                prompt_embeds=prompt_embeds,
-                negative_prompt_embeds=negative_prompt_embeds,
+                prompt_embeds=prompt_emb,
+                negative_prompt_embeds=negative_prompt_emb,
                 guidance_scale=guidance_scale,
                 generator=generator,
                 num_inference_steps=num_inference_steps,

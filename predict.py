@@ -659,19 +659,22 @@ class Predictor(BasePredictor):
             #     textual_inversion_manager=textual_inversion_manager,
             #     truncate_long_prompts=False,
             # )
-            if prompt:
-                conditioning = self.compel_proc.build_conditioning_tensor(prompt)
-                if not negative_prompt:
-                    negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
-                negative_conditioning = self.compel_proc.build_conditioning_tensor(
-                    negative_prompt
-                )
-                [
-                    prompt_embeds,
-                    negative_prompt_embeds,
-                ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
-                    [conditioning, negative_conditioning]
-                )
+            # if prompt:
+            #     conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+            #     if not negative_prompt:
+            #         negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+            #     negative_conditioning = self.compel_proc.build_conditioning_tensor(
+            #         negative_prompt
+            #     )
+            #     [
+            #         prompt_embeds,
+            #         negative_prompt_embeds,
+            #     ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+            #         [conditioning, negative_conditioning]
+            #     )
+            [prompt_embeds, negative_prompt_embeds] = self.compel_proc(
+                [prompt, negative_prompt]
+            )
 
             # if control_image and image:
             #     control_image = control_images[idx % len(control_images)]

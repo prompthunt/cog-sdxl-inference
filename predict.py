@@ -366,7 +366,7 @@ class Predictor(BasePredictor):
         )
 
         print("Loading tile pipeline...")
-        self.cnet_tile_pipe = StableDiffusionControlNetPipeline(
+        self.cnet_tile_pipe = StableDiffusionControlNetImg2ImgPipeline(
             vae=self.txt2img_pipe.vae,
             text_encoder=self.txt2img_pipe.text_encoder,
             tokenizer=self.txt2img_pipe.tokenizer,

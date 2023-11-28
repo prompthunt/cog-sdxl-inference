@@ -689,7 +689,7 @@ class Predictor(BasePredictor):
                 prompt_embeds=prompt_embeds,
                 negative_prompt_embeds=negative_prompt_embeds,
                 image=condition_image,
-                controlnet_conditioning_image=condition_image,
+                control_image=condition_image,
                 width=condition_image.size[0],
                 height=condition_image.size[1],
                 strength=tile_strength,

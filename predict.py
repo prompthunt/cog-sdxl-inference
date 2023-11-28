@@ -680,18 +680,18 @@ class Predictor(BasePredictor):
             yield path_to_output
 
             # Do tile run
-            source_image = output.images[0]
-            condition_image = resize_for_condition_image(
-                source_image, width * tile_scale
+            source_image_tile = output.images[0]
+            condition_image_tile = resize_for_condition_image(
+                source_image_tile, width * tile_scale
             )
 
             tile_output = self.cnet_tile_pipe(
                 prompt_embeds=prompt_embeds,
                 negative_prompt_embeds=negative_prompt_embeds,
-                image=condition_image,
-                control_image=condition_image,
-                width=condition_image.size[0],
-                height=condition_image.size[1],
+                image=condition_image_tile,
+                control_image=condition_image_tile,
+                width=condition_image_tile.size[0],
+                height=condition_image_tile.size[1],
                 strength=tile_strength,
                 generator=torch.manual_seed(0),
                 num_inference_steps=tile_steps,
@@ -703,8 +703,7 @@ class Predictor(BasePredictor):
             path_to_output = Path(output_path)
             yield path_to_output
 
-            if show_debug_images:
-                tile_output.save(f"/tmp/seed-tile-{this_seed}.png")
+            tile_output.save(f"/tmp/seed-tile-{this_seed}.png")
 
             if should_swap_face:
                 if source_image:

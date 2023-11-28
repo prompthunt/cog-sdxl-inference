@@ -701,6 +701,7 @@ class Predictor(BasePredictor):
             output_path = f"/tmp/seed-tile-{this_seed}.png"
             tile_output.save(output_path)
             path_to_output = Path(output_path)
+            yield path_to_output
 
             if show_debug_images:
                 tile_output.save(f"/tmp/seed-tile-{this_seed}.png")

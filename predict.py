@@ -424,22 +424,22 @@ class Predictor(BasePredictor):
         #     description="Weights url",
         #     default=None,
         # ),
-        control_image: Path = Input(
-            description="Optional Image to use for guidance based on posenet",
-            default=None,
-        ),
-        pose_image: Path = Input(
-            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
-            default=None,
-        ),
-        image: Path = Input(
-            description="Optional Image to use for img2img guidance",
-            default=None,
-        ),
-        mask: Path = Input(
-            description="Optional Mask to use for legacy inpainting",
-            default=None,
-        ),
+        # control_image: Path = Input(
+        #     description="Optional Image to use for guidance based on posenet",
+        #     default=None,
+        # ),
+        # pose_image: Path = Input(
+        #     description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+        #     default=None,
+        # ),
+        # image: Path = Input(
+        #     description="Optional Image to use for img2img guidance",
+        #     default=None,
+        # ),
+        # mask: Path = Input(
+        #     description="Optional Mask to use for legacy inpainting",
+        #     default=None,
+        # ),
         prompt: str = Input(
             description="Input prompt",
             default="photo of cjw person",
@@ -469,12 +469,12 @@ class Predictor(BasePredictor):
         guidance_scale: float = Input(
             description="Scale for classifier-free guidance", ge=1, le=50, default=7.5
         ),
-        prompt_strength: float = Input(
-            description="Prompt strength when using init image. 1.0 corresponds to full destruction of information in init image",
-            ge=0.0,
-            le=1.0,
-            default=0.8,
-        ),
+        # prompt_strength: float = Input(
+        #     description="Prompt strength when using init image. 1.0 corresponds to full destruction of information in init image",
+        #     ge=0.0,
+        #     le=1.0,
+        #     default=0.8,
+        # ),
         scheduler: str = Input(
             default="DPMSolverMultistep",
             choices=[
@@ -494,54 +494,54 @@ class Predictor(BasePredictor):
         seed: int = Input(
             description="Random seed. Leave blank to randomize the seed", default=None
         ),
-        should_swap_face: bool = Input(
-            description="Should swap face",
-            default=False,
-        ),
-        source_image: Path = Input(
-            description="Source image for face swap",
-            default=None,
-        ),
-        show_debug_images: bool = Input(
-            description="Show debug images",
-            default=False,
-        ),
-        prompt_2: str = Input(
-            description="Input prompt",
-            default=None,
-        ),
-        prompt_3: str = Input(
-            description="Input prompt",
-            default=None,
-        ),
-        prompt_4: str = Input(
-            description="Input prompt",
-            default=None,
-        ),
-        pose_image_2: Path = Input(
-            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
-            default=None,
-        ),
-        pose_image_3: Path = Input(
-            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
-            default=None,
-        ),
-        pose_image_4: Path = Input(
-            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
-            default=None,
-        ),
-        tile_strength: float = Input(
-            description="Tile strength",
-            default=0.2,
-        ),
-        tile_steps: int = Input(
-            description="Tile steps",
-            default=32,
-        ),
-        tile_scale: float = Input(
-            description="Tile scale",
-            default=1.5,
-        ),
+        # should_swap_face: bool = Input(
+        #     description="Should swap face",
+        #     default=False,
+        # ),
+        # source_image: Path = Input(
+        #     description="Source image for face swap",
+        #     default=None,
+        # ),
+        # show_debug_images: bool = Input(
+        #     description="Show debug images",
+        #     default=False,
+        # ),
+        # prompt_2: str = Input(
+        #     description="Input prompt",
+        #     default=None,
+        # ),
+        # prompt_3: str = Input(
+        #     description="Input prompt",
+        #     default=None,
+        # ),
+        # prompt_4: str = Input(
+        #     description="Input prompt",
+        #     default=None,
+        # ),
+        # pose_image_2: Path = Input(
+        #     description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+        #     default=None,
+        # ),
+        # pose_image_3: Path = Input(
+        #     description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+        #     default=None,
+        # ),
+        # pose_image_4: Path = Input(
+        #     description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+        #     default=None,
+        # ),
+        # tile_strength: float = Input(
+        #     description="Tile strength",
+        #     default=0.2,
+        # ),
+        # tile_steps: int = Input(
+        #     description="Tile steps",
+        #     default=32,
+        # ),
+        # tile_scale: float = Input(
+        #     description="Tile scale",
+        #     default=1.5,
+        # ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:

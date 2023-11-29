@@ -754,10 +754,14 @@ class Predictor(BasePredictor):
                 print("Uploading to Cloudflare...")
                 try:
                     # uuid
+                    # image to use is upscaled_image_path if exists, else output_path
+                    image_to_use = (
+                        upscaled_image_path if upscale_final_image else output_path
+                    )
                     id = str(uuid.uuid4())
                     cf_url = upload_to_cloudflare(
                         id,
-                        str(path_to_output),
+                        str(image_to_use),
                         cf_acc_id,
                         cf_api_key,
                     )

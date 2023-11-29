@@ -492,6 +492,18 @@ class Predictor(BasePredictor):
             description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
             default=None,
         ),
+        source_image_2: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_3: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_4: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
         upscale_final_image: bool = Input(
             description="Upscale final image",
             default=True,
@@ -613,6 +625,15 @@ class Predictor(BasePredictor):
         # Remove non existent control images
         control_images = [x for x in control_images if x]
 
+        source_images = [
+            source_image,
+            source_image_2,
+            source_image_3,
+            source_image_4,
+        ]
+        # Remove non existent source images
+        source_images = [x for x in source_images if x]
+
         for idx in range(num_outputs):
             this_seed = seed + idx
             generator = torch.Generator("cuda").manual_seed(this_seed)
@@ -660,10 +681,11 @@ class Predictor(BasePredictor):
                 yield path_to_output
 
             if should_swap_face:
+                source_image_to_use = source_images[idx % len(source_images)]
                 if source_image:
                     # Swap all faces in first pass images
                     output_path = f"/tmp/seed-swapped-{this_seed}.png"
-                    swapped_image = self.swap_face(path_to_output, source_image)
+                    swapped_image = self.swap_face(path_to_output, source_image_to_use)
                     swapped_image.save(output_path)
                     path_to_output = Path(output_path)
                     yield path_to_output

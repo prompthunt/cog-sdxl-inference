@@ -1,6 +1,7 @@
 # Ignore line too long
 # flake8: noqa: E501
 
+import uuid
 import hashlib
 import os
 import shutil
@@ -29,6 +30,7 @@ from diffusers import (
     AutoencoderKL,
     # StableDiffusionControlNetInpaintPipeline,
 )
+from cloudflare import upload_to_cloudflare, get_watermarked_image
 
 
 from diffusers.utils import load_image
@@ -559,6 +561,14 @@ class Predictor(BasePredictor):
             description="Use new vae",
             default=False,
         ),
+        cf_acc_id: str = Input(
+            description="Cloudflare account ID",
+            default=None,
+        ),
+        cf_api_key: str = Input(
+            description="Cloudflare API key",
+            default=None,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
@@ -739,3 +749,31 @@ class Predictor(BasePredictor):
                 )
                 path_to_output = Path(upscaled_image_path)
                 yield path_to_output
+
+            if cf_acc_id and cf_api_key:
+                print("Uploading to Cloudflare...")
+                try:
+                    # uuid
+                    id = str(uuid.uuid4())
+                    cf_url = upload_to_cloudflare(
+                        id,
+                        str(path_to_output),
+                        cf_acc_id,
+                        cf_api_key,
+                    )
+                    print("Uploaded to Cloudflare:", cf_url)
+                    yield Path(cf_url)
+
+                    # Watermark the image
+                    watermarked_image_url = get_watermarked_image(
+                        cf_url,
+                        576,
+                        cf_acc_id,
+                        cf_api_key,
+                    )
+                    print("Watermarked image:", watermarked_image_url)
+
+                    # Return the watermarked image
+                    yield Path(watermarked_image_url)
+                except Exception as e:
+                    print("Failed to upload to Cloudflare", str(e))

@@ -305,7 +305,7 @@ class Predictor(BasePredictor):
             vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse")
 
             self.txt2img_pipe = StableDiffusionPipeline.from_pretrained(
-                "weights",
+                weights_folder,
                 safety_checker=None,
                 feature_extractor=self.feature_extractor,
                 vae=vae,
@@ -313,7 +313,7 @@ class Predictor(BasePredictor):
             ).to("cuda")
         else:
             self.txt2img_pipe = StableDiffusionPipeline.from_pretrained(
-                "weights",
+                weights_folder,
                 safety_checker=None,
                 feature_extractor=self.feature_extractor,
                 torch_dtype=torch.float16,

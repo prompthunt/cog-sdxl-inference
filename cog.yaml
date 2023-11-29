@@ -25,6 +25,7 @@ build:
     - "codeformer-pip"
     - "tensorrt"
     - "timm"
+    - "requests-toolbelt"
 
   run:
     - curl -o /usr/local/bin/pget -L "https://github.com/replicate/pget/releases/download/v0.0.1/pget" && chmod +x /usr/local/bin/pget

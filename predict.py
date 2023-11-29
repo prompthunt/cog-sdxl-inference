@@ -1,21 +1,17 @@
 # Ignore line too long
 # flake8: noqa: E501
 
-import hashlib
-import json
 import os
 import shutil
 import subprocess
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from weights import WeightsDownloadCache
+from typing import List
 
 import numpy as np
 import torch
 from cog import BasePredictor, Input, Path
 from diffusers import (
     DDIMScheduler,
-    DiffusionPipeline,
     DPMSolverMultistepScheduler,
     EulerAncestralDiscreteScheduler,
     EulerDiscreteScheduler,
@@ -29,19 +25,12 @@ from diffusers import (
     StableDiffusionPipeline,
     StableDiffusionControlNetPipeline,
     StableDiffusionControlNetImg2ImgPipeline,
-    StableDiffusionControlNetInpaintPipeline,
+    # StableDiffusionControlNetInpaintPipeline,
 )
-from diffusers.models.attention_processor import LoRAAttnProcessor2_0
-from diffusers.pipelines.stable_diffusion.safety_checker import (
-    StableDiffusionSafetyChecker,
-)
+
 from diffusers.utils import load_image
-from safetensors import safe_open
-from safetensors.torch import load_file
-from transformers import CLIPImageProcessor
 from PIL import Image
 
-from dataset_and_utils import TokenEmbeddingsHandler
 
 from gfpgan import GFPGANer
 from realesrgan.utils import RealESRGANer
@@ -55,16 +44,6 @@ import onnxruntime
 from insightface.app import FaceAnalysis
 from codeformer.app import inference_app
 
-
-SDXL_MODEL_CACHE = "./sdxl-cache"
-REFINER_MODEL_CACHE = "./refiner-cache"
-SAFETY_CACHE = "./safety-cache"
-FEATURE_EXTRACTOR = "./feature-extractor"
-SDXL_URL = "https://weights.replicate.delivery/default/sdxl/sdxl-vae-upcast-fix.tar"
-REFINER_URL = (
-    "https://weights.replicate.delivery/default/sdxl/refiner-no-vae-no-encoder-1.0.tar"
-)
-SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 
 EMBEDDINGS = [
     (x.split(".")[0], "./embeddings/" + x) for x in os.listdir("./embeddings/")

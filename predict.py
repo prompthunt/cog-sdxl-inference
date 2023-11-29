@@ -764,16 +764,16 @@ class Predictor(BasePredictor):
                     print("Uploaded to Cloudflare:", cf_url)
                     yield Path(cf_url)
 
-                    # Watermark the image
-                    watermarked_image_url = get_watermarked_image(
-                        cf_url,
-                        576,
-                        cf_acc_id,
-                        cf_api_key,
-                    )
-                    print("Watermarked image:", watermarked_image_url)
+                    # # Watermark the image
+                    # watermarked_image_url = get_watermarked_image(
+                    #     cf_url,
+                    #     576,
+                    #     cf_acc_id,
+                    #     cf_api_key,
+                    # )
+                    # print("Watermarked image:", watermarked_image_url)
 
-                    # Return the watermarked image
-                    yield Path(watermarked_image_url)
+                    # # Return the watermarked image
+                    # yield Path(watermarked_image_url)
                 except Exception as e:
                     print("Failed to upload to Cloudflare", str(e))

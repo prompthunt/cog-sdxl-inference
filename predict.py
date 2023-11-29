@@ -747,7 +747,7 @@ class Predictor(BasePredictor):
                     upscale=upscale_final_size,
                     codeformer_fidelity=upscale_fidelity,
                 )
-                # path_to_output = Path(upscaled_image_path)
+                path_to_output = Path(upscaled_image_path)
                 # yield path_to_output
 
             if cf_acc_id and cf_api_key:

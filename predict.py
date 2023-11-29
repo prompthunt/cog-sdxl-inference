@@ -1,6 +1,7 @@
 # Ignore line too long
 # flake8: noqa: E501
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -249,30 +250,50 @@ class Predictor(BasePredictor):
         return load_image("/tmp/image.png").convert("RGB")
 
     def download_zip_weights_python(self, url):
-        """Download the model weights from the given URL"""
         print("Downloading weights...")
 
-        if os.path.exists("weights"):
-            shutil.rmtree("weights")
-        os.makedirs("weights")
+        # Generate a hash value from the URL
+        url_hash = hashlib.md5(url.encode()).hexdigest()
+        hash_folder = os.path.join("weights", url_hash)
 
-        import zipfile
-        from io import BytesIO
-        import urllib.request
+        # Check if the folder already exists and has contents
+        if os.path.exists(hash_folder) and os.listdir(hash_folder):
+            print("Weights already downloaded.")
+            return hash_folder
+        else:
+            # Remove the folder if it exists and is empty, then recreate it
+            if os.path.exists(hash_folder):
+                shutil.rmtree(hash_folder)
+            os.makedirs(hash_folder)
 
-        url = urllib.request.urlopen(url)
-        with zipfile.ZipFile(BytesIO(url.read())) as zf:
-            zf.extractall("weights")
+            import zipfile
+            from io import BytesIO
+            import urllib.request
+
+            # Download and extract the weights
+            url_response = urllib.request.urlopen(url)
+            with zipfile.ZipFile(BytesIO(url_response.read())) as zf:
+                zf.extractall(hash_folder)
+            print("Weights downloaded and saved in:", hash_folder)
+
+        return hash_folder
 
     def load_weights(self, url, use_new_vae=False):
         """Load the model into memory to make running multiple predictions efficient"""
-        print("Loading Safety pipeline...")
 
-        if url == self.url:
-            return
+        # Release resources held by existing pipeline objects
+        self.txt2img_pipe = None
+        self.img2img_pipe = None
+        self.inpaint_pipe = None
+        self.cnet_tile_pipe = None
+        self.cnet_txt2img_pipe = None
+        self.cnet_img2img_pipe = None
+        torch.cuda.empty_cache()  # Clear GPU cache if using CUDA
 
         start_time = time.time()
-        self.download_zip_weights_python(url)
+        weights_folder = self.download_zip_weights_python(
+            url
+        )  # This now returns the folder path
         print("Downloaded weights in {:.2f} seconds".format(time.time() - start_time))
 
         start_time = time.time()
@@ -295,12 +316,6 @@ class Predictor(BasePredictor):
                 feature_extractor=self.feature_extractor,
                 torch_dtype=torch.float16,
             ).to("cuda")
-
-        # Print current path and all subfolders
-        print("Current path:")
-        print(os.getcwd())
-        print("Subfolders:")
-        print(os.listdir(os.getcwd()))
 
         # Embedding path is current path / embeddings
         EMBEDDING_PATHS = [
@@ -346,12 +361,28 @@ class Predictor(BasePredictor):
             feature_extractor=self.txt2img_pipe.feature_extractor,
         ).to("cuda")
 
-        print("Loading controlnet...")
+        print("Loading pose controlnet...")
         controlnet = ControlNetModel.from_pretrained(
             "lllyasviel/sd-controlnet-openpose",
             torch_dtype=torch.float16,
-            cache_dir="diffusers-cache",
         )
+        # print("Loading tile controlnet...")
+        # controlnet_tile = ControlNetModel.from_pretrained(
+        #     "lllyasviel/control_v11f1e_sd15_tile",
+        #     torch_dtype=torch.float16,
+        # )
+
+        # print("Loading tile pipeline...")
+        # self.cnet_tile_pipe = StableDiffusionControlNetImg2ImgPipeline(
+        #     vae=self.txt2img_pipe.vae,
+        #     text_encoder=self.txt2img_pipe.text_encoder,
+        #     tokenizer=self.txt2img_pipe.tokenizer,
+        #     unet=self.txt2img_pipe.unet,
+        #     scheduler=self.txt2img_pipe.scheduler,
+        #     safety_checker=self.txt2img_pipe.safety_checker,
+        #     feature_extractor=self.txt2img_pipe.feature_extractor,
+        #     controlnet=controlnet_tile,
+        # ).to("cuda")
 
         print("Loading controlnet txt2img...")
         self.cnet_txt2img_pipe = StableDiffusionControlNetPipeline(
@@ -378,11 +409,6 @@ class Predictor(BasePredictor):
         )
 
         print("Loaded pipelines in {:.2f} seconds".format(time.time() - start_time))
-
-        # self.txt2img_pipe.set_progress_bar_config(disable=True)
-        # self.img2img_pipe.set_progress_bar_config(disable=True)
-        # self.inpaint_pipe.set_progress_bar_config(disable=True)
-        self.url = url
 
     @torch.inference_mode()
     def predict(

@@ -569,7 +569,7 @@ class Predictor(BasePredictor):
             description="Cloudflare API key",
             default=None,
         ),
-    ) -> List[Path]:
+    ) -> List[str]:
         """Run a single prediction on the model."""
         if seed is None:
             seed = int.from_bytes(os.urandom(2), "big")
@@ -722,8 +722,8 @@ class Predictor(BasePredictor):
             output.images[0].save(output_path)
             path_to_output = Path(output_path)
             # If show_debug_images or (no swap and no upscale)
-            if show_debug_images or (not should_swap_face and not upscale_final_image):
-                yield path_to_output
+            # if show_debug_images or (not should_swap_face and not upscale_final_image):
+            #     yield path_to_output
 
             if should_swap_face:
                 source_image_to_use = source_images[idx % len(source_images)]
@@ -734,8 +734,8 @@ class Predictor(BasePredictor):
                     swapped_image.save(output_path)
                     path_to_output = Path(output_path)
                     # If show_debug_images or no upscale
-                    if show_debug_images or not upscale_final_image:
-                        yield path_to_output
+                    # if show_debug_images or not upscale_final_image:
+                    #     yield path_to_output
                 else:
                     print("No source image provided, skipping face swap")
 
@@ -747,8 +747,8 @@ class Predictor(BasePredictor):
                     upscale=upscale_final_size,
                     codeformer_fidelity=upscale_fidelity,
                 )
-                path_to_output = Path(upscaled_image_path)
-                yield path_to_output
+                # path_to_output = Path(upscaled_image_path)
+                # yield path_to_output
 
             if cf_acc_id and cf_api_key:
                 print("Uploading to Cloudflare...")
@@ -762,7 +762,7 @@ class Predictor(BasePredictor):
                         cf_api_key,
                     )
                     print("Uploaded to Cloudflare:", cf_url)
-                    yield Path(cf_url)
+                    yield cf_url
 
                     # # Watermark the image
                     # watermarked_image_url = get_watermarked_image(
@@ -773,7 +773,7 @@ class Predictor(BasePredictor):
                     # )
                     # print("Watermarked image:", watermarked_image_url)
 
-                    # # Return the watermarked image
-                    # yield Path(watermarked_image_url)
+                    # Return the watermarked image
+                    # yield watermarked_image_url
                 except Exception as e:
                     print("Failed to upload to Cloudflare", str(e))

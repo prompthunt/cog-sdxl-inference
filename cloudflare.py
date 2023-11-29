@@ -55,25 +55,30 @@ def get_watermarked_image(
         id = str(uuid.uuid4())
         watermark_service_url = f"https://watermark.picstudioimages.com/?imageUrl={image_url}&logoWidth={logo_width}"
 
+        print(f"Generated watermark service URL: {watermark_service_url}")
+
         response = requests.get(watermark_service_url)
+        print(f"Watermark service response status: {response.status_code}")
+
         if response.status_code != 200:
+            print(
+                f"Failed to get watermarked image. Status code: {response.status_code}, Response: {response.text}"
+            )
             raise Exception("Error getting watermarked image")
 
-        # Assuming the watermark service returns the image directly
-        # If it returns a URL or JSON, modify this part accordingly
         watermarked_image_data = response.content
-
-        # Call to upload to Cloudflare (assuming the function can handle binary data)
-        uploaded_image_url = upload_to_cloudflare(
-            id,
-            watermarked_image_data,
-            cloudflare_account,
-            cloudflare_api_key,
+        print(
+            f"Received watermarked image data. Size: {len(watermarked_image_data)} bytes"
         )
+
+        uploaded_image_url = upload_to_cloudflare(
+            id, watermarked_image_data, cloudflare_account, cloudflare_api_key
+        )
+        print(f"Uploaded to Cloudflare. URL: {uploaded_image_url}")
 
         return uploaded_image_url
     except Exception as error:
-        print(error)
+        print(f"Error in get_watermarked_image: {error}")
         raise
 
 

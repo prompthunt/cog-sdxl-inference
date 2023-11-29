@@ -25,8 +25,10 @@ from diffusers import (
     StableDiffusionPipeline,
     StableDiffusionControlNetPipeline,
     StableDiffusionControlNetImg2ImgPipeline,
+    AutoencoderKL,
     # StableDiffusionControlNetInpaintPipeline,
 )
+
 
 from diffusers.utils import load_image
 from PIL import Image
@@ -262,7 +264,7 @@ class Predictor(BasePredictor):
         with zipfile.ZipFile(BytesIO(url.read())) as zf:
             zf.extractall("weights")
 
-    def load_weights(self, url):
+    def load_weights(self, url, use_new_vae=False):
         """Load the model into memory to make running multiple predictions efficient"""
         print("Loading Safety pipeline...")
 
@@ -275,12 +277,36 @@ class Predictor(BasePredictor):
 
         start_time = time.time()
         print("Loading SD pipeline...")
-        self.txt2img_pipe = StableDiffusionPipeline.from_pretrained(
-            "weights",
-            safety_checker=None,
-            feature_extractor=self.feature_extractor,
-            torch_dtype=torch.float16,
-        ).to("cuda")
+
+        if use_new_vae:
+            vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse")
+
+            self.txt2img_pipe = StableDiffusionPipeline.from_pretrained(
+                "weights",
+                safety_checker=None,
+                feature_extractor=self.feature_extractor,
+                vae=vae,
+                torch_dtype=torch.float16,
+            ).to("cuda")
+        else:
+            self.txt2img_pipe = StableDiffusionPipeline.from_pretrained(
+                "weights",
+                safety_checker=None,
+                feature_extractor=self.feature_extractor,
+                torch_dtype=torch.float16,
+            ).to("cuda")
+
+        # Print current path and all subfolders
+        print("Current path:")
+        print(os.getcwd())
+        print("Subfolders:")
+        print(os.listdir(os.getcwd()))
+
+        # Embedding path is current path / embeddings
+        EMBEDDING_PATHS = [
+            os.path.join(os.getcwd(), "embeddings", x)
+            for x in os.listdir(os.path.join(os.getcwd(), "embeddings"))
+        ]
 
         self.txt2img_pipe.load_textual_inversion(
             EMBEDDING_PATHS, token=EMBEDDING_TOKENS, local_files_only=True
@@ -503,6 +529,10 @@ class Predictor(BasePredictor):
             description="Upscale face upsample",
             default=True,
         ),
+        use_new_vae: bool = Input(
+            description="Use new vae",
+            default=False,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
@@ -516,7 +546,7 @@ class Predictor(BasePredictor):
 
         if weights is None:
             raise ValueError("No weights provided")
-        self.load_weights(weights)
+        self.load_weights(weights, use_new_vae=use_new_vae)
 
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:

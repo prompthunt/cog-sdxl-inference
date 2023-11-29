@@ -676,8 +676,8 @@ class Predictor(BasePredictor):
             output_path = f"/tmp/seed-{this_seed}.png"
             output.images[0].save(output_path)
             path_to_output = Path(output_path)
-            # If show_debug_images or is no face swap
-            if show_debug_images or not should_swap_face:
+            # If show_debug_images or (no swap and no upscale)
+            if show_debug_images or (not should_swap_face and not upscale_final_image):
                 yield path_to_output
 
             if should_swap_face:
@@ -688,7 +688,9 @@ class Predictor(BasePredictor):
                     swapped_image = self.swap_face(path_to_output, source_image_to_use)
                     swapped_image.save(output_path)
                     path_to_output = Path(output_path)
-                    yield path_to_output
+                    # If show_debug_images or no upscale
+                    if show_debug_images or not upscale_final_image:
+                        yield path_to_output
                 else:
                     print("No source image provided, skipping face swap")
 

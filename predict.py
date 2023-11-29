@@ -53,6 +53,7 @@ from transformers import CLIPFeatureExtractor
 import insightface
 import onnxruntime
 from insightface.app import FaceAnalysis
+from codeformer.app import inference_app
 
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
@@ -491,6 +492,26 @@ class Predictor(BasePredictor):
             description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
             default=None,
         ),
+        upscale_final_image: bool = Input(
+            description="Upscale final image",
+            default=True,
+        ),
+        upscale_final_size: int = Input(
+            description="Upscale final size multiplier",
+            default=4,
+        ),
+        upscale_fidelity: float = Input(
+            description="Upscale codeformer fidelity",
+            default=0.7,
+        ),
+        upscale_background_enhance: bool = Input(
+            description="Upscale background enhance",
+            default=True,
+        ),
+        upscale_face_upsample: bool = Input(
+            description="Upscale face upsample",
+            default=True,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
@@ -648,3 +669,14 @@ class Predictor(BasePredictor):
                     yield path_to_output
                 else:
                     print("No source image provided, skipping face swap")
+
+            if upscale_final_image:
+                upscaled_image_path = inference_app(
+                    image=output_path,
+                    background_enhance=upscale_background_enhance,
+                    face_upsample=upscale_face_upsample,
+                    upscale=upscale_final_size,
+                    codeformer_fidelity=upscale_fidelity,
+                )
+                path_to_output = Path(upscaled_image_path)
+                yield path_to_output

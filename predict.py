@@ -146,7 +146,7 @@ class Predictor(BasePredictor):
         if control_image is None:
             return None
 
-        return self.openpose(control_image, include_hand=True)
+        return self.openpose(control_image)
 
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""

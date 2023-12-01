@@ -809,7 +809,9 @@ class Predictor(BasePredictor):
                     [conditioning, negative_conditioning]
                 )
 
-            control_image = control_images[idx % len(control_images)]
+            control_image = resized_control_images[idx % len(control_images)]
+
+            # Log size of images
 
             output = pipe(
                 prompt_embeds=prompt_embeds,

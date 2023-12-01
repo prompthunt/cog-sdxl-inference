@@ -507,7 +507,7 @@ class Predictor(BasePredictor):
             default=0.8,
         ),
         scheduler: str = Input(
-            default="DPMSolverMultistep",
+            default="DPM++SDEKarras",
             choices=[
                 "DDIM",
                 "DPMSolverMultistep",
@@ -726,6 +726,9 @@ class Predictor(BasePredictor):
         ]
         # Remove non existent source images
         source_images = [x for x in source_images if x]
+
+        # Filter face images
+        source_images = self.filter_images_with_faces(source_images)
 
         initial_output_images = []
 

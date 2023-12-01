@@ -811,8 +811,6 @@ class Predictor(BasePredictor):
 
             control_image = resized_control_images[idx % len(control_images)]
 
-            # Log size of images
-
             output = pipe(
                 prompt_embeds=prompt_embeds,
                 negative_prompt_embeds=negative_prompt_embeds,

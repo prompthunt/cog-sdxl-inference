@@ -12,12 +12,10 @@ build:
     - "diffusers"
     - "torch==2.0.1"
     - "transformers"
-    - "invisible-watermark"
     - "accelerate"
     - "pandas"
     - "torchvision"
     - "safetensors"
-    - "mediapipe"
     - "gfpgan"
     - "realesrgan"
     - "insightface==0.7.3"
@@ -29,8 +27,6 @@ build:
 
   run:
     - curl -o /usr/local/bin/pget -L "https://github.com/replicate/pget/releases/download/v0.0.1/pget" && chmod +x /usr/local/bin/pget
-    # - wget http://thegiflibrary.tumblr.com/post/11565547760 -O face_landmarker_v2_with_blendshapes.task -q https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
-    # - pip install git+https://github.com/wiktorlazarski/head-segmentation.git
     - pip install compel==2.0.2
     - "mkdir /src/cache -p && cd /src/cache && wget https://chroma-ckpt.s3.amazonaws.com/inswapper_128.onnx"
     - "mkdir -p ~/.insightface/models/buffalo_l/"

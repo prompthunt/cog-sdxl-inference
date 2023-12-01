@@ -50,6 +50,17 @@ from insightface.app import FaceAnalysis
 from codeformer.app import inference_app
 
 
+def resize_for_condition_image(input_image: Image, k: float):
+    input_image = input_image.convert("RGB")
+    W, H = input_image.size
+    H *= k
+    W *= k
+    H = int(round(H / 64.0)) * 64
+    W = int(round(W / 64.0)) * 64
+    img = input_image.resize((W, H), resample=Image.LANCZOS)
+    return img
+
+
 EMBEDDINGS = [
     (x.split(".")[0], "./embeddings/" + x) for x in os.listdir("./embeddings/")
 ]
@@ -206,6 +217,31 @@ class Predictor(BasePredictor):
         )
         self.face_analyser = FaceAnalysis(name="buffalo_l")
         self.face_analyser.prepare(ctx_id=0, det_thresh=0.5, det_size=(640, 640))
+
+    def has_faces(self, img_data: Path):
+        """
+        Checks if the given image data contains any faces.
+        Returns True if faces are found, otherwise False.
+        """
+        frame = cv2.imread(str(img_data))
+        try:
+            analysed = self.face_analyser.get(frame)
+            return len(analysed) > 0
+        except Exception as e:
+            print(str(e))
+            return False
+
+    def filter_images_with_faces(self, source_images: List[Path]):
+        """
+        Filters the given array of source images.
+        Returns a new array containing only those images with faces.
+        """
+        images_with_faces = []
+        for img in source_images:
+            if self.has_faces(img):
+                images_with_faces.append(img)
+
+        return images_with_faces
 
     def get_face(self, img_data, image_type="target"):
         try:
@@ -561,6 +597,18 @@ class Predictor(BasePredictor):
             description="Use new vae",
             default=False,
         ),
+        second_pass_strength: float = Input(
+            description="Second pass strength",
+            default=0.8,
+        ),
+        second_pass_guidance_scale: float = Input(
+            description="Second pass guidance scale",
+            default=3,
+        ),
+        second_pass_steps: int = Input(
+            description="Second pass steps",
+            default=50,
+        ),
         cf_acc_id: str = Input(
             description="Cloudflare account ID",
             default=None,
@@ -679,6 +727,8 @@ class Predictor(BasePredictor):
         # Remove non existent source images
         source_images = [x for x in source_images if x]
 
+        initial_output_images = []
+
         for idx in range(num_outputs):
             this_seed = seed + idx
             generator = torch.Generator("cuda").manual_seed(this_seed)
@@ -718,37 +768,123 @@ class Predictor(BasePredictor):
                 **extra_kwargs,
             )
 
-            output_path = f"/tmp/seed-{this_seed}.png"
-            output.images[0].save(output_path)
-            path_to_output = Path(output_path)
+            initial_output_images.append(output.images[0])
+
+        # Resize all initial images by 1.5
+        resized_initial_output_images = []
+        for idx, output in enumerate(initial_output_images):
+            resized_image = resize_for_condition_image(output, 1.5)
+            resized_initial_output_images.append(resized_image)
+
+        # Resize condition images by 1.5
+        resized_control_images = []
+        for idx, control_image in enumerate(control_images):
+            resized_image = resize_for_condition_image(control_image, 1.5)
+            resized_control_images.append(resized_image)
+
+        second_pass_images = []
+        pipe = self.cnet_img2img_pipe
+        pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
+
+        # Run second passes
+        for idx, resized_initital_image in enumerate(resized_initial_output_images):
+            # Get new seed and generator
+            this_seed = seed + idx + 1000
+            generator = torch.Generator("cuda").manual_seed(this_seed)
+
+            # Pick a prompt round robin
+            prompt = prompts[idx % len(prompts)]
+
+            if prompt:
+                conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+                if not negative_prompt:
+                    negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+                negative_conditioning = self.compel_proc.build_conditioning_tensor(
+                    negative_prompt
+                )
+                [
+                    prompt_embeds,
+                    negative_prompt_embeds,
+                ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+                    [conditioning, negative_conditioning]
+                )
+
+            control_image = control_images[idx % len(control_images)]
+
+            output = pipe(
+                prompt_embeds=prompt_embeds,
+                negative_prompt_embeds=negative_prompt_embeds,
+                guidance_scale=second_pass_guidance_scale,
+                generator=generator,
+                num_inference_steps=second_pass_steps,
+                control_image=control_image,
+                image=resized_initital_image,
+                strength=second_pass_strength,
+            )
+
+            second_pass_images.append(output.images[0])
+
+        # Swap faces
+        swapped_faces_images_paths = []
+        for idx, second_pass_image in enumerate(second_pass_images):
+            source_image_to_use = source_images[idx % len(source_images)]
+
+            second_pass_image_path = f"/tmp/second-pass-{idx}.png"
+            second_pass_image.save(second_pass_image_path)
+            second_pass_image_path = Path(second_pass_image_path)
+
+            output_path = f"/tmp/seed-swapped-{idx}.png"
+            swapped_image = self.swap_face(second_pass_image_path, source_image_to_use)
+            # Save swapped image and add path to swapped_faces_images
+            swapped_image.save(output_path)
+            swapped_image_path = Path(output_path)
+            swapped_faces_images_paths.append(swapped_image_path)
+
+            # If show_debug_images or no upscale
+            # if show_debug_images or not upscale_final_image:
+            #     yield path_to_output
+
+            # output_path = f"/tmp/seed-{this_seed}.png"
+            # output.images[0].save(output_path)
+            # path_to_output = Path(output_path)
             # If show_debug_images or (no swap and no upscale)
             # if show_debug_images or (not should_swap_face and not upscale_final_image):
             #     yield path_to_output
 
-            if should_swap_face:
-                source_image_to_use = source_images[idx % len(source_images)]
-                if source_image:
-                    # Swap all faces in first pass images
-                    output_path = f"/tmp/seed-swapped-{this_seed}.png"
-                    swapped_image = self.swap_face(path_to_output, source_image_to_use)
-                    swapped_image.save(output_path)
-                    path_to_output = Path(output_path)
-                    # If show_debug_images or no upscale
-                    # if show_debug_images or not upscale_final_image:
-                    #     yield path_to_output
-                else:
-                    print("No source image provided, skipping face swap")
+            # if should_swap_face:
+            #     source_image_to_use = source_images[idx % len(source_images)]
+            #     if source_image:
+            #         # Swap all faces in first pass images
+            #         output_path = f"/tmp/seed-swapped-{this_seed}.png"
+            #         swapped_image = self.swap_face(path_to_output, source_image_to_use)
+            #         swapped_image.save(output_path)
+            #         path_to_output = Path(output_path)
+            #         # If show_debug_images or no upscale
+            #         # if show_debug_images or not upscale_final_image:
+            #         #     yield path_to_output
+            #     else:
+            #         print("No source image provided, skipping face swap")
 
-            if upscale_final_image:
-                upscaled_image_path = inference_app(
-                    image=output_path,
-                    background_enhance=upscale_background_enhance,
-                    face_upsample=upscale_face_upsample,
-                    upscale=upscale_final_size,
-                    codeformer_fidelity=upscale_fidelity,
-                )
-                path_to_output = Path(upscaled_image_path)
-                # yield path_to_output
+            # Second pass
+
+            # output_path = f"/tmp/seed-second-{second_seed}.png"
+            # output.images[0].save(output_path)
+            # path_to_output = Path(output_path)
+            # If show_debug_images or (no swap and no upscale)
+            # if show_debug_images or (not should_swap_face and not upscale_final_image):
+            #     yield path_to_output
+
+        # Upscale all swapped images
+        for idx, swapped_faces_image_path in enumerate(swapped_faces_images_paths):
+            upscaled_image_path = inference_app(
+                image=swapped_faces_image_path,
+                background_enhance=upscale_background_enhance,
+                face_upsample=upscale_face_upsample,
+                upscale=upscale_final_size,
+                codeformer_fidelity=upscale_fidelity,
+            )
+            path_to_output = Path(upscaled_image_path)
+            # yield path_to_output
 
             if cf_acc_id and cf_api_key:
                 print("Uploading to Cloudflare...")

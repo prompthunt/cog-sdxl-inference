@@ -884,7 +884,9 @@ class Predictor(BasePredictor):
                 codeformer_fidelity=upscale_fidelity,
             )
             path_to_output = Path(upscaled_image_path)
-            # yield path_to_output
+            # If no (cf_acc_id and cf_api_key)
+            if not cf_acc_id or not cf_api_key:
+                yield path_to_output
 
             if cf_acc_id and cf_api_key:
                 print("Uploading to Cloudflare...")

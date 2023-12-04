@@ -617,7 +617,7 @@ class Predictor(BasePredictor):
             description="Cloudflare API key",
             default=None,
         ),
-    ) -> List[str]:
+    ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
             seed = int.from_bytes(os.urandom(2), "big")

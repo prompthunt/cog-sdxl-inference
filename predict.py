@@ -746,8 +746,6 @@ class Predictor(BasePredictor):
             prompt_strength_3,
             prompt_strength_4,
         ]
-        # Remove prompt strengths for non existent images
-        prompt_strengths = [x for x, y in zip(prompt_strength, images) if y]
 
         control_images = [
             control_image,

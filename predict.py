@@ -794,10 +794,10 @@ class Predictor(BasePredictor):
                 )
 
             if control_image and image:
-                image = images[idx % len(images)]
-                control_image = control_images[idx % len(control_images)]
-                extra_kwargs["control_image"] = control_image
-                extra_kwargs["image"] = image
+                extra_kwargs["control_image"] = control_images[
+                    idx % len(control_images)
+                ]
+                extra_kwargs["image"] = images[idx % len(images)]
                 extra_kwargs["strength"] = prompt_strengths[idx % len(prompt_strengths)]
             elif control_image:
                 control_image = control_images[idx % len(control_images)]
@@ -891,7 +891,9 @@ class Predictor(BasePredictor):
                 upscale=upscale_final_size,
                 codeformer_fidelity=upscale_fidelity,
             )
-            path_to_output = Path(upscaled_image_path)
+            new_path = f"/tmp/seed-third-{idx}.png"
+            shutil.copyfile(upscaled_image_path, new_path)
+            path_to_output = Path(new_path)
             third_pass_image_paths.append(path_to_output)
 
             if show_debug_images:

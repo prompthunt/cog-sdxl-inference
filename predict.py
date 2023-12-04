@@ -525,10 +525,6 @@ class Predictor(BasePredictor):
         seed: int = Input(
             description="Random seed. Leave blank to randomize the seed", default=None
         ),
-        should_swap_face: bool = Input(
-            description="Should swap face",
-            default=False,
-        ),
         source_image: Path = Input(
             description="Source image for face swap",
             default=None,
@@ -536,46 +532,6 @@ class Predictor(BasePredictor):
         show_debug_images: bool = Input(
             description="Show debug images",
             default=False,
-        ),
-        prompt_2: str = Input(
-            description="Input prompt",
-            default=None,
-        ),
-        prompt_3: str = Input(
-            description="Input prompt",
-            default=None,
-        ),
-        prompt_4: str = Input(
-            description="Input prompt",
-            default=None,
-        ),
-        pose_image_2: Path = Input(
-            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
-            default=None,
-        ),
-        pose_image_3: Path = Input(
-            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
-            default=None,
-        ),
-        pose_image_4: Path = Input(
-            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
-            default=None,
-        ),
-        source_image_2: Path = Input(
-            description="Source image for face swap",
-            default=None,
-        ),
-        source_image_3: Path = Input(
-            description="Source image for face swap",
-            default=None,
-        ),
-        source_image_4: Path = Input(
-            description="Source image for face swap",
-            default=None,
-        ),
-        upscale_final_image: bool = Input(
-            description="Upscale final image",
-            default=True,
         ),
         upscale_final_size: int = Input(
             description="Upscale final size multiplier",
@@ -609,6 +565,72 @@ class Predictor(BasePredictor):
             description="Second pass steps",
             default=50,
         ),
+        prompt_2: str = Input(
+            description="Input prompt",
+            default=None,
+        ),
+        prompt_3: str = Input(
+            description="Input prompt",
+            default=None,
+        ),
+        prompt_4: str = Input(
+            description="Input prompt",
+            default=None,
+        ),
+        pose_image_2: Path = Input(
+            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+            default=None,
+        ),
+        pose_image_3: Path = Input(
+            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+            default=None,
+        ),
+        pose_image_4: Path = Input(
+            description="Direct Pose image to use for guidance based on posenet, if available, ignores control_image",
+            default=None,
+        ),
+        image_2: Path = Input(
+            description="Optional Image to use for img2img guidance",
+            default=None,
+        ),
+        image_3: Path = Input(
+            description="Optional Image to use for img2img guidance",
+            default=None,
+        ),
+        image_4: Path = Input(
+            description="Optional Image to use for img2img guidance",
+            default=None,
+        ),
+        prompt_strength_2: float = Input(
+            description="Prompt strength when using init image. 1.0 corresponds to full destruction of information in init image",
+            ge=0.0,
+            le=1.0,
+            default=0.8,
+        ),
+        prompt_strength_3: float = Input(
+            description="Prompt strength when using init image. 1.0 corresponds to full destruction of information in init image",
+            ge=0.0,
+            le=1.0,
+            default=0.8,
+        ),
+        prompt_strength_4: float = Input(
+            description="Prompt strength when using init image. 1.0 corresponds to full destruction of information in init image",
+            ge=0.0,
+            le=1.0,
+            default=0.8,
+        ),
+        source_image_2: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_3: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_4: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
         cf_acc_id: str = Input(
             description="Cloudflare account ID",
             default=None,
@@ -638,6 +660,12 @@ class Predictor(BasePredictor):
 
         if image:
             image = self.load_image(image)
+        if image_2:
+            image_2 = self.load_image(image_2)
+        if image_3:
+            image_3 = self.load_image(image_3)
+        if image_4:
+            image_4 = self.load_image(image_4)
         if pose_image:
             control_image = self.load_image(pose_image)
         elif control_image:
@@ -659,7 +687,6 @@ class Predictor(BasePredictor):
         else:
             control_image_4 = None
 
-        kwargs = {}
         if control_image and mask:
             raise ValueError("Cannot use controlnet and inpainting at the same time")
         elif control_image and image:
@@ -709,6 +736,19 @@ class Predictor(BasePredictor):
         # Remove non existent prompts
         prompts = [x for x in prompts if x]
 
+        images = [image, image_2, image_3, image_4]
+        # Remove non existent images
+        images = [x for x in images if x]
+
+        prompt_strengths = [
+            prompt_strength,
+            prompt_strength_2,
+            prompt_strength_3,
+            prompt_strength_4,
+        ]
+        # Remove prompt strengths for non existent images
+        prompt_strengths = [x for x, y in zip(prompt_strength, images) if y]
+
         control_images = [
             control_image,
             control_image_2,
@@ -756,8 +796,11 @@ class Predictor(BasePredictor):
                 )
 
             if control_image and image:
+                image = images[idx % len(images)]
                 control_image = control_images[idx % len(control_images)]
                 extra_kwargs["control_image"] = control_image
+                extra_kwargs["image"] = image
+                extra_kwargs["strength"] = prompt_strengths[idx % len(prompt_strengths)]
             elif control_image:
                 control_image = control_images[idx % len(control_images)]
                 extra_kwargs["image"] = control_image
@@ -833,11 +876,11 @@ class Predictor(BasePredictor):
             )
 
             second_pass_images.append(output.images[0])
+            output_path = f"/tmp/seed-second-{this_seed}.png"
+            output.images[0].save(output_path)
+            path_to_output = Path(output_path)
+            second_pass_image_paths.append(path_to_output)
             if show_debug_images:
-                output_path = f"/tmp/seed-second-{this_seed}.png"
-                output.images[0].save(output_path)
-                path_to_output = Path(output_path)
-                second_pass_image_paths.append(path_to_output)
                 yield path_to_output
 
         third_pass_image_paths = []

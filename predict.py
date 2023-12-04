@@ -772,6 +772,12 @@ class Predictor(BasePredictor):
             )
 
             initial_output_images.append(output.images[0])
+            output_path = f"/tmp/seed-{this_seed}.png"
+            output.images[0].save(output_path)
+            path_to_output = Path(output_path)
+            # If show_debug_images or (no swap and no upscale)
+            if show_debug_images:
+                yield path_to_output
 
         # Resize all initial images by 1.5
         resized_initial_output_images = []
@@ -826,6 +832,11 @@ class Predictor(BasePredictor):
             )
 
             second_pass_images.append(output.images[0])
+            if show_debug_images:
+                output_path = f"/tmp/seed-second-{this_seed}.png"
+                output.images[0].save(output_path)
+                path_to_output = Path(output_path)
+                yield path_to_output
 
         # Swap faces
         swapped_faces_images_paths = []
@@ -844,8 +855,8 @@ class Predictor(BasePredictor):
             swapped_faces_images_paths.append(swapped_image_path)
 
             # If show_debug_images or no upscale
-            # if show_debug_images or not upscale_final_image:
-            #     yield path_to_output
+            if show_debug_images:
+                yield swapped_image_path
 
             # output_path = f"/tmp/seed-{this_seed}.png"
             # output.images[0].save(output_path)

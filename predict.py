@@ -205,7 +205,7 @@ class Predictor(BasePredictor):
         # Use GFPGAN for face enhancement
         self.face_enhancer = GFPGANer(
             model_path="gfpgan/weights/GFPGANv1.4.pth",
-            upscale=2,
+            upscale=1,
             arch="clean",
             channel_multiplier=2,
             bg_upsampler=self.upsampler,
@@ -792,6 +792,7 @@ class Predictor(BasePredictor):
             resized_control_images.append(resized_image)
 
         second_pass_images = []
+        second_pass_image_paths = []
         pipe = self.cnet_img2img_pipe
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 
@@ -836,19 +837,32 @@ class Predictor(BasePredictor):
                 output_path = f"/tmp/seed-second-{this_seed}.png"
                 output.images[0].save(output_path)
                 path_to_output = Path(output_path)
+                second_pass_image_paths.append(path_to_output)
+                yield path_to_output
+
+        third_pass_image_paths = []
+
+        for idx, image_path in enumerate(second_pass_image_paths):
+            upscaled_image_path = inference_app(
+                image=image_path,
+                background_enhance=upscale_background_enhance,
+                face_upsample=upscale_face_upsample,
+                upscale=upscale_final_size,
+                codeformer_fidelity=upscale_fidelity,
+            )
+            path_to_output = Path(upscaled_image_path)
+            third_pass_image_paths.append(path_to_output)
+
+            if show_debug_images:
                 yield path_to_output
 
         # Swap faces
         swapped_faces_images_paths = []
-        for idx, second_pass_image in enumerate(second_pass_images):
+        for idx, third_pass_image_path in enumerate(third_pass_image_paths):
             source_image_to_use = source_images[idx % len(source_images)]
 
-            second_pass_image_path = f"/tmp/second-pass-{idx}.png"
-            second_pass_image.save(second_pass_image_path)
-            second_pass_image_path = Path(second_pass_image_path)
-
             output_path = f"/tmp/seed-swapped-{idx}.png"
-            swapped_image = self.swap_face(second_pass_image_path, source_image_to_use)
+            swapped_image = self.swap_face(third_pass_image_path, source_image_to_use)
             # Save swapped image and add path to swapped_faces_images
             swapped_image.save(output_path)
             swapped_image_path = Path(output_path)
@@ -858,58 +872,12 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield swapped_image_path
 
-            # output_path = f"/tmp/seed-{this_seed}.png"
-            # output.images[0].save(output_path)
-            # path_to_output = Path(output_path)
-            # If show_debug_images or (no swap and no upscale)
-            # if show_debug_images or (not should_swap_face and not upscale_final_image):
-            #     yield path_to_output
-
-            # if should_swap_face:
-            #     source_image_to_use = source_images[idx % len(source_images)]
-            #     if source_image:
-            #         # Swap all faces in first pass images
-            #         output_path = f"/tmp/seed-swapped-{this_seed}.png"
-            #         swapped_image = self.swap_face(path_to_output, source_image_to_use)
-            #         swapped_image.save(output_path)
-            #         path_to_output = Path(output_path)
-            #         # If show_debug_images or no upscale
-            #         # if show_debug_images or not upscale_final_image:
-            #         #     yield path_to_output
-            #     else:
-            #         print("No source image provided, skipping face swap")
-
-            # Second pass
-
-            # output_path = f"/tmp/seed-second-{second_seed}.png"
-            # output.images[0].save(output_path)
-            # path_to_output = Path(output_path)
-            # If show_debug_images or (no swap and no upscale)
-            # if show_debug_images or (not should_swap_face and not upscale_final_image):
-            #     yield path_to_output
-
-        # Upscale all swapped images
-        for idx, swapped_faces_image_path in enumerate(swapped_faces_images_paths):
-            upscaled_image_path = inference_app(
-                image=swapped_faces_image_path,
-                background_enhance=upscale_background_enhance,
-                face_upsample=upscale_face_upsample,
-                upscale=upscale_final_size,
-                codeformer_fidelity=upscale_fidelity,
-            )
-            path_to_output = Path(upscaled_image_path)
-            # If no (cf_acc_id and cf_api_key)
-            if not cf_acc_id or not cf_api_key:
-                yield path_to_output
-
             if cf_acc_id and cf_api_key:
                 print("Uploading to Cloudflare...")
                 try:
                     # uuid
                     # image to use is upscaled_image_path if exists, else output_path
-                    image_to_use = (
-                        upscaled_image_path if upscale_final_image else output_path
-                    )
+                    image_to_use = swapped_image_path
                     id = str(uuid.uuid4())
                     cf_url = upload_to_cloudflare(
                         id,

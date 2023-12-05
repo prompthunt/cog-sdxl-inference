@@ -957,14 +957,14 @@ class Predictor(BasePredictor):
 
                 # Debug: Print the type and size of 'control_image'
                 print("Type of 'control_image':", type(control_image))
-                if isinstance(control_image, PIL.Image.Image):
+                if isinstance(control_image, Image.Image):
                     print("'control_image' size:", control_image.size)
 
             # Debug: Print final second_pass_args before passing to the pipeline
             print("Final 'second_pass_args':")
             for key, value in second_pass_args.items():
-                if isinstance(value, PIL.Image.Image):
-                    print(f"{key}: PIL.Image.Image of size {value.size}")
+                if isinstance(value, Image.Image):
+                    print(f"{key}: Image.Image of size {value.size}")
                 else:
                     print(f"{key}: {type(value)}")
 

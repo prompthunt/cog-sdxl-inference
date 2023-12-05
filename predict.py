@@ -294,11 +294,6 @@ class Predictor(BasePredictor):
         url_hash = hashlib.md5(url.encode()).hexdigest()
         hash_folder = os.path.join("weights", url_hash)
 
-        # Remove other cached models
-        for folder in os.listdir("weights"):
-            if folder != url_hash:
-                shutil.rmtree(os.path.join("weights", folder))
-
         # Check if the folder already exists and has contents
         if os.path.exists(hash_folder) and os.listdir(hash_folder):
             print("Weights already downloaded.")

@@ -297,6 +297,15 @@ class Predictor(BasePredictor):
         # Check if the folder already exists and has contents
         if os.path.exists(hash_folder) and os.listdir(hash_folder):
             print("Weights already downloaded.")
+
+            # List other folders in the weights folder
+            weights_folder_path = os.path.join(os.getcwd(), "weights")
+
+            # If it exists, remove all subfolders except the one we want
+            for folder in os.listdir(weights_folder_path):
+                if folder != url_hash:
+                    shutil.rmtree(os.path.join(weights_folder_path, folder))
+
             return hash_folder
         else:
             # Remove the folder if it exists and is empty, then recreate it
@@ -807,6 +816,19 @@ class Predictor(BasePredictor):
                 extra_kwargs["image"] = images[idx % len(images)]
                 extra_kwargs["strength"] = prompt_strengths[idx % len(prompt_strengths)]
 
+            # print pipe inputs
+            print(
+                "pipe inputs:",
+                {
+                    "prompt_embeds": prompt_embeds,
+                    "negative_prompt_embeds": negative_prompt_embeds,
+                    "guidance_scale": guidance_scale,
+                    "generator": generator,
+                    "num_inference_steps": num_inference_steps,
+                    **extra_kwargs,
+                },
+            )
+
             output = pipe(
                 prompt_embeds=prompt_embeds,
                 negative_prompt_embeds=negative_prompt_embeds,
@@ -902,6 +924,9 @@ class Predictor(BasePredictor):
             if control_image:
                 control_image = resized_control_images[idx % len(control_images)]
                 second_pass_args["control_image"] = control_image
+
+            # print pipe inputs
+            print("pipe inputs:", second_pass_args)
 
             output = pipe(**second_pass_args)
 

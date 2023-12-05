@@ -785,6 +785,10 @@ class Predictor(BasePredictor):
         # Filter face images
         source_images = self.filter_images_with_faces(source_images)
 
+        # If no usable source images, throw error
+        if len(source_images) == 0:
+            raise ValueError("No usable source images")
+
         initial_output_images = []
         first_pass_image_paths = []
 
@@ -847,7 +851,7 @@ class Predictor(BasePredictor):
             )
 
             initial_output_images.append(output.images[0])
-            output_path = f"/tmp/seed-{this_seed}.png"
+            output_path = f"/tmp/fist-pass-seed-{this_seed}.png"
             output.images[0].save(output_path)
             path_to_output = Path(output_path)
             first_pass_image_paths.append(path_to_output)
@@ -862,7 +866,7 @@ class Predictor(BasePredictor):
         for idx, first_pass_image_path in enumerate(first_pass_image_paths):
             source_image_to_use = source_images[idx % len(source_images)]
 
-            output_path = f"/tmp/seed-swapped-{idx}.png"
+            output_path = f"/tmp/seed-face-swap-face{idx + 1}.png"
             swapped_image = self.swap_face(first_pass_image_path, source_image_to_use)
             # Save swapped image and add path to swapped_faces_images
             swapped_image.save(output_path)
@@ -970,7 +974,7 @@ class Predictor(BasePredictor):
             output = pipe(**second_pass_args)
 
             second_pass_images.append(output.images[0])
-            output_path = f"/tmp/seed-second-{this_seed}.png"
+            output_path = f"/tmp/second-pass-seed-{this_seed}.png"
             output.images[0].save(output_path)
             path_to_output = Path(output_path)
             second_pass_image_paths.append(path_to_output)
@@ -987,7 +991,7 @@ class Predictor(BasePredictor):
                 upscale=upscale_final_size,
                 codeformer_fidelity=upscale_fidelity,
             )
-            new_path = f"/tmp/seed-third-{idx}.png"
+            new_path = f"/tmp/second-pass-upscaled-{idx}.png"
             shutil.copyfile(upscaled_image_path, new_path)
             path_to_output = Path(new_path)
             third_pass_image_paths.append(path_to_output)
@@ -1000,7 +1004,7 @@ class Predictor(BasePredictor):
         for idx, third_pass_image_path in enumerate(third_pass_image_paths):
             # source_image_to_use = source_images[idx % len(source_images)]
 
-            # output_path = f"/tmp/seed-swapped-{idx}.png"
+            # output_path = f"/tmp/seed-face-swap-{idx}.png"
             # swapped_image = self.swap_face(third_pass_image_path, source_image_to_use)
             # # Save swapped image and add path to swapped_faces_images
             # swapped_image.save(output_path)

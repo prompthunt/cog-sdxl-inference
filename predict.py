@@ -871,11 +871,11 @@ class Predictor(BasePredictor):
                 yield
 
         # Swap faces on all first pass images
-        for idx, first_pass_image in enumerate(first_pass_images):
+        for idx, first_pass_image_path in enumerate(first_pass_image_paths):
             source_image_to_use = source_images[idx % len(source_images)]
 
             output_path = f"/tmp/first-pass-face-swapped-face-{idx + 1}.png"
-            swapped_image = self.swap_face(first_pass_image, source_image_to_use)
+            swapped_image = self.swap_face(first_pass_image_path, source_image_to_use)
             # Save swapped image and add path to first_pass_face_swapped_images
             swapped_image.save(output_path)
             swapped_image_path = Path(output_path)
@@ -957,11 +957,11 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield path_to_output
 
-        for idx, second_pass_image in enumerate(second_pass_images):
+        for idx, second_pass_image_path in enumerate(second_pass_image_paths):
             source_image_to_use = source_images[idx % len(source_images)]
 
             output_path = f"/tmp/second-pass-face-swapped-face-{idx + 1}.png"
-            swapped_image = self.swap_face(second_pass_image, source_image_to_use)
+            swapped_image = self.swap_face(second_pass_image_path, source_image_to_use)
             # Save swapped image and add path to swapped_faces_images
             swapped_image.save(output_path)
             swapped_image_path = Path(output_path)
@@ -1035,7 +1035,6 @@ class Predictor(BasePredictor):
                     yield cf_url
                 except Exception as e:
                     print("Failed to upload to Cloudflare", str(e))
-            
 
         # if cf_acc_id and cf_api_key:
         #     print("Uploading to Cloudflare...")

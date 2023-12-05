@@ -413,23 +413,23 @@ class Predictor(BasePredictor):
             "lllyasviel/sd-controlnet-openpose",
             torch_dtype=torch.float16,
         )
-        # print("Loading tile controlnet...")
-        # controlnet_tile = ControlNetModel.from_pretrained(
-        #     "lllyasviel/control_v11f1e_sd15_tile",
-        #     torch_dtype=torch.float16,
-        # )
+        print("Loading tile controlnet...")
+        controlnet_tile = ControlNetModel.from_pretrained(
+            "lllyasviel/control_v11f1e_sd15_tile",
+            torch_dtype=torch.float16,
+        )
 
-        # print("Loading tile pipeline...")
-        # self.cnet_tile_pipe = StableDiffusionControlNetImg2ImgPipeline(
-        #     vae=self.txt2img_pipe.vae,
-        #     text_encoder=self.txt2img_pipe.text_encoder,
-        #     tokenizer=self.txt2img_pipe.tokenizer,
-        #     unet=self.txt2img_pipe.unet,
-        #     scheduler=self.txt2img_pipe.scheduler,
-        #     safety_checker=self.txt2img_pipe.safety_checker,
-        #     feature_extractor=self.txt2img_pipe.feature_extractor,
-        #     controlnet=controlnet_tile,
-        # ).to("cuda")
+        print("Loading tile pipeline...")
+        self.cnet_tile_pipe = StableDiffusionControlNetImg2ImgPipeline(
+            vae=self.txt2img_pipe.vae,
+            text_encoder=self.txt2img_pipe.text_encoder,
+            tokenizer=self.txt2img_pipe.tokenizer,
+            unet=self.txt2img_pipe.unet,
+            scheduler=self.txt2img_pipe.scheduler,
+            safety_checker=self.txt2img_pipe.safety_checker,
+            feature_extractor=self.txt2img_pipe.feature_extractor,
+            controlnet=controlnet_tile,
+        ).to("cuda")
 
         print("Loading controlnet txt2img...")
         self.cnet_txt2img_pipe = StableDiffusionControlNetPipeline(

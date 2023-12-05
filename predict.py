@@ -657,7 +657,7 @@ class Predictor(BasePredictor):
             default=None,
         ),
         # Returns an object
-    ) -> List[Path]:
+    ) -> Any:
         # Object type
         """Run a single prediction on the model."""
         if seed is None:
@@ -799,6 +799,8 @@ class Predictor(BasePredictor):
         second_pass_image_paths = []
         second_pass_face_swapped_images = []
         second_pass_face_swapped_image_paths = []
+        second_pass_with_face_swap_base_images = []
+        second_pass_with_face_swap_base_image_paths = []
         codeformer_images = []
         codeformer_image_paths = []
         codeformer_face_swapped_images = []
@@ -889,7 +891,7 @@ class Predictor(BasePredictor):
 
         # Resize all initial images by 1.5, these will be used as base images for second pass
         resized_first_pass_images = []
-        for idx, first_pass_image in enumerate(first_pass_images):
+        for idx, first_pass_image in enumerate(first_pass_face_swapped_images):
             resized_image = resize_for_condition_image(first_pass_image, 1.5)
             resized_first_pass_images.append(resized_image)
 
@@ -1023,26 +1025,26 @@ class Predictor(BasePredictor):
         # Output is object with key value pairs key being filename and value being cloudflare uploaded url
         final_output = {}
 
-        # # Upload to cloudflare
-        # if cf_acc_id and cf_api_key:
-        #     for image_path in all_image_paths:
-        #         try:
-        #             # Id is uuid + the image filename
-        #             filename = str(image_path).split("/")[-1]
-        #             id = str(uuid.uuid4()) + "-" + filename
-        #             cf_url = upload_to_cloudflare(
-        #                 id,
-        #                 str(image_path),
-        #                 cf_acc_id,
-        #                 cf_api_key,
-        #             )
-        #             print("Uploaded to Cloudflare:", cf_url)
-        #             final_output[filename] = cf_url
-        #         except Exception as e:
-        #             print("Failed to upload to Cloudflare", str(e))
+        # Upload to cloudflare
+        if cf_acc_id and cf_api_key:
+            for image_path in all_image_paths:
+                try:
+                    # Id is uuid + the image filename
+                    filename = str(image_path).split("/")[-1]
+                    id = str(uuid.uuid4()) + "-" + filename
+                    cf_url = upload_to_cloudflare(
+                        id,
+                        str(image_path),
+                        cf_acc_id,
+                        cf_api_key,
+                    )
+                    print("Uploaded to Cloudflare:", cf_url)
+                    final_output[filename] = cf_url
+                except Exception as e:
+                    print("Failed to upload to Cloudflare", str(e))
 
-        # # Return the final output
-        # yield final_output  
+        # Return the final output
+        yield final_output
 
         # if cf_acc_id and cf_api_key:
         #     print("Uploading to Cloudflare...")

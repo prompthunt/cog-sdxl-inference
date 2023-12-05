@@ -1007,6 +1007,36 @@ class Predictor(BasePredictor):
                 yield swapped_image_path
 
         # # Upload all outputs to Cloudflare
+
+        # Combine all paths
+        all_image_paths = (
+            first_pass_image_paths
+            + first_pass_face_swapped_image_paths
+            + second_pass_image_paths
+            + second_pass_face_swapped_image_paths
+            + codeformer_image_paths
+            + codeformer_face_swapped_image_paths
+        )
+
+        # Upload to cloudflare
+        if cf_acc_id and cf_api_key:
+            for image_path in all_image_paths:
+                try:
+                    # Id is uuid + the image filename
+                    filename = str(image_path).split("/")[-1]
+                    id = str(uuid.uuid4()) + "-" + filename
+                    cf_url = upload_to_cloudflare(
+                        id,
+                        str(image_path),
+                        cf_acc_id,
+                        cf_api_key,
+                    )
+                    print("Uploaded to Cloudflare:", cf_url)
+                    yield cf_url
+                except Exception as e:
+                    print("Failed to upload to Cloudflare", str(e))
+            
+
         # if cf_acc_id and cf_api_key:
         #     print("Uploading to Cloudflare...")
         #     # Upload all first pass images

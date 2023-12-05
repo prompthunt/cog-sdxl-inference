@@ -931,14 +931,42 @@ class Predictor(BasePredictor):
                 "strength": second_pass_strength,
             }
 
+            # Debug: Print the type and size of 'resized_initital_image' to verify it's not None and correctly formatted
+            print("Type of 'resized_initital_image':", type(resized_initital_image))
+            if isinstance(resized_initital_image, Image.Image):
+                print("'resized_initital_image' size:", resized_initital_image.size)
+
             if use_tile:
                 second_pass_args[
                     "controlnet_conditioning_image"
                 ] = resized_initital_image
 
+                # Debug: Verify the assignment
+                print(
+                    "Using tile. 'controlnet_conditioning_image' set to 'resized_initital_image'"
+                )
+                if isinstance(resized_initital_image, Image.Image):
+                    print(
+                        "'controlnet_conditioning_image' size:",
+                        resized_initital_image.size,
+                    )
+
             elif control_image and not disable_cn_second_pass:
                 control_image = resized_control_images[idx % len(control_images)]
                 second_pass_args["control_image"] = control_image
+
+                # Debug: Print the type and size of 'control_image'
+                print("Type of 'control_image':", type(control_image))
+                if isinstance(control_image, PIL.Image.Image):
+                    print("'control_image' size:", control_image.size)
+
+            # Debug: Print final second_pass_args before passing to the pipeline
+            print("Final 'second_pass_args':")
+            for key, value in second_pass_args.items():
+                if isinstance(value, PIL.Image.Image):
+                    print(f"{key}: PIL.Image.Image of size {value.size}")
+                else:
+                    print(f"{key}: {type(value)}")
 
             # print pipe inputs
             print("pipe inputs:", second_pass_args)
@@ -1016,3 +1044,6 @@ class Predictor(BasePredictor):
                     # yield watermarked_image_url
                 except Exception as e:
                     print("Failed to upload to Cloudflare", str(e))
+            else:
+                print("Not uploading to Cloudflare")
+                yield third_pass_image_path

@@ -937,17 +937,13 @@ class Predictor(BasePredictor):
                 print("'resized_initital_image' size:", resized_initital_image.size)
 
             if use_tile:
-                second_pass_args[
-                    "controlnet_conditioning_image"
-                ] = resized_initital_image
+                second_pass_args["control_image"] = resized_initital_image
 
                 # Debug: Verify the assignment
-                print(
-                    "Using tile. 'controlnet_conditioning_image' set to 'resized_initital_image'"
-                )
+                print("Using tile. 'control_image' set to 'resized_initital_image'")
                 if isinstance(resized_initital_image, Image.Image):
                     print(
-                        "'controlnet_conditioning_image' size:",
+                        "'control_image' size:",
                         resized_initital_image.size,
                     )
 

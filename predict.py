@@ -803,6 +803,9 @@ class Predictor(BasePredictor):
             elif control_image:
                 control_image = control_images[idx % len(control_images)]
                 extra_kwargs["image"] = control_image
+            elif image:
+                extra_kwargs["image"] = images[idx % len(images)]
+                extra_kwargs["strength"] = prompt_strengths[idx % len(prompt_strengths)]
 
             output = pipe(
                 prompt_embeds=prompt_embeds,
@@ -855,7 +858,12 @@ class Predictor(BasePredictor):
 
         second_pass_images = []
         second_pass_image_paths = []
-        pipe = self.cnet_img2img_pipe
+
+        if control_image:
+            pipe = self.cnet_img2img_pipe
+        else:
+            pipe = self.img2img_pipe
+
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 
         # Run second passes
@@ -881,18 +889,21 @@ class Predictor(BasePredictor):
                     [conditioning, negative_conditioning]
                 )
 
-            control_image = resized_control_images[idx % len(control_images)]
+            second_pass_args = {
+                "prompt_embeds": prompt_embeds,
+                "negative_prompt_embeds": negative_prompt_embeds,
+                "guidance_scale": second_pass_guidance_scale,
+                "generator": generator,
+                "num_inference_steps": second_pass_steps,
+                "image": resized_initital_image,
+                "strength": second_pass_strength,
+            }
 
-            output = pipe(
-                prompt_embeds=prompt_embeds,
-                negative_prompt_embeds=negative_prompt_embeds,
-                guidance_scale=second_pass_guidance_scale,
-                generator=generator,
-                num_inference_steps=second_pass_steps,
-                control_image=control_image,
-                image=resized_initital_image,
-                strength=second_pass_strength,
-            )
+            if control_image:
+                control_image = resized_control_images[idx % len(control_images)]
+                second_pass_args["control_image"] = control_image
+
+            output = pipe(**second_pass_args)
 
             second_pass_images.append(output.images[0])
             output_path = f"/tmp/seed-second-{this_seed}.png"

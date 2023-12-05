@@ -294,6 +294,11 @@ class Predictor(BasePredictor):
         url_hash = hashlib.md5(url.encode()).hexdigest()
         hash_folder = os.path.join("weights", url_hash)
 
+        # Remove other cached models
+        for folder in os.listdir("weights"):
+            if folder != url_hash:
+                shutil.rmtree(os.path.join("weights", folder))
+
         # Check if the folder already exists and has contents
         if os.path.exists(hash_folder) and os.listdir(hash_folder):
             print("Weights already downloaded.")
@@ -769,6 +774,7 @@ class Predictor(BasePredictor):
         source_images = self.filter_images_with_faces(source_images)
 
         initial_output_images = []
+        first_pass_image_paths = []
 
         for idx in range(num_outputs):
             this_seed = seed + idx
@@ -816,13 +822,33 @@ class Predictor(BasePredictor):
             output_path = f"/tmp/seed-{this_seed}.png"
             output.images[0].save(output_path)
             path_to_output = Path(output_path)
+            first_pass_image_paths.append(path_to_output)
             # If show_debug_images or (no swap and no upscale)
             if show_debug_images:
                 yield path_to_output
 
+        # If len(source_images) is not 0, then swap
+
+        swapped_faces_images_paths = []
+        swapped_faces_images = []
+        for idx, first_pass_image_path in enumerate(first_pass_image_paths):
+            source_image_to_use = source_images[idx % len(source_images)]
+
+            output_path = f"/tmp/seed-swapped-{idx}.png"
+            swapped_image = self.swap_face(first_pass_image_path, source_image_to_use)
+            # Save swapped image and add path to swapped_faces_images
+            swapped_image.save(output_path)
+            swapped_image_path = Path(output_path)
+            swapped_faces_images_paths.append(swapped_image_path)
+            swapped_faces_images.append(swapped_image)
+
+            # If show_debug_images or no upscale
+            if show_debug_images:
+                yield swapped_image_path
+
         # Resize all initial images by 1.5
         resized_initial_output_images = []
-        for idx, output in enumerate(initial_output_images):
+        for idx, output in enumerate(swapped_faces_images):
             resized_image = resize_for_condition_image(output, 1.5)
             resized_initial_output_images.append(resized_image)
 
@@ -887,7 +913,7 @@ class Predictor(BasePredictor):
             upscaled_image_path = inference_app(
                 image=image_path,
                 background_enhance=upscale_background_enhance,
-                face_upsample=upscale_face_upsample,
+                face_upsample=False,
                 upscale=upscale_final_size,
                 codeformer_fidelity=upscale_fidelity,
             )
@@ -900,27 +926,27 @@ class Predictor(BasePredictor):
                 yield path_to_output
 
         # Swap faces
-        swapped_faces_images_paths = []
+        # swapped_faces_images_paths = []
         for idx, third_pass_image_path in enumerate(third_pass_image_paths):
-            source_image_to_use = source_images[idx % len(source_images)]
+            # source_image_to_use = source_images[idx % len(source_images)]
 
-            output_path = f"/tmp/seed-swapped-{idx}.png"
-            swapped_image = self.swap_face(third_pass_image_path, source_image_to_use)
-            # Save swapped image and add path to swapped_faces_images
-            swapped_image.save(output_path)
-            swapped_image_path = Path(output_path)
-            swapped_faces_images_paths.append(swapped_image_path)
+            # output_path = f"/tmp/seed-swapped-{idx}.png"
+            # swapped_image = self.swap_face(third_pass_image_path, source_image_to_use)
+            # # Save swapped image and add path to swapped_faces_images
+            # swapped_image.save(output_path)
+            # swapped_image_path = Path(output_path)
+            # swapped_faces_images_paths.append(swapped_image_path)
 
             # If show_debug_images or no upscale
-            if show_debug_images:
-                yield swapped_image_path
+            # if show_debug_images:
+            #     yield swapped_image_path
 
             if cf_acc_id and cf_api_key:
                 print("Uploading to Cloudflare...")
                 try:
                     # uuid
                     # image to use is upscaled_image_path if exists, else output_path
-                    image_to_use = swapped_image_path
+                    image_to_use = third_pass_image_path
                     id = str(uuid.uuid4())
                     cf_url = upload_to_cloudflare(
                         id,

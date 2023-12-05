@@ -7,7 +7,7 @@ import os
 import shutil
 import subprocess
 import time
-from typing import List
+from typing import List, Any
 
 import numpy as np
 import torch
@@ -656,7 +656,9 @@ class Predictor(BasePredictor):
             description="Cloudflare API key",
             default=None,
         ),
-    ) -> List[Path]:
+        # Returns an object
+    ) -> Any:
+        # Object type
         """Run a single prediction on the model."""
         if seed is None:
             seed = int.from_bytes(os.urandom(2), "big")
@@ -868,7 +870,7 @@ class Predictor(BasePredictor):
             first_pass_image_paths.append(path_to_output)
             # If show_debug_images or (no swap and no upscale)
             if show_debug_images:
-                yield
+                yield path_to_output
 
         # Swap faces on all first pass images
         for idx, first_pass_image_path in enumerate(first_pass_image_paths):
@@ -981,7 +983,7 @@ class Predictor(BasePredictor):
                 upscale=upscale_final_size,
                 codeformer_fidelity=upscale_fidelity,
             )
-            new_path = f"/tmp/second-pass-upscaled-{idx}.png"
+            new_path = f"/tmp/codeformer-{idx}.png"
             shutil.copyfile(upscaled_image_path, new_path)
             path_to_output = Path(new_path)
 
@@ -1018,6 +1020,9 @@ class Predictor(BasePredictor):
             + codeformer_face_swapped_image_paths
         )
 
+        # Output is object with key value pairs key being filename and value being cloudflare uploaded url
+        final_output = {}
+
         # Upload to cloudflare
         if cf_acc_id and cf_api_key:
             for image_path in all_image_paths:
@@ -1032,9 +1037,12 @@ class Predictor(BasePredictor):
                         cf_api_key,
                     )
                     print("Uploaded to Cloudflare:", cf_url)
-                    yield cf_url
+                    final_output[filename] = cf_url
                 except Exception as e:
                     print("Failed to upload to Cloudflare", str(e))
+
+        # Return the final output
+        yield final_output
 
         # if cf_acc_id and cf_api_key:
         #     print("Uploading to Cloudflare...")

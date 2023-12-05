@@ -878,172 +878,172 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield swapped_image_path
 
-        # Resize all initial images by 1.5
-        resized_initial_output_images = []
-        for idx, output in enumerate(swapped_faces_images):
-            resized_image = resize_for_condition_image(output, 1.5)
-            resized_initial_output_images.append(resized_image)
+        # # Resize all initial images by 1.5
+        # resized_initial_output_images = []
+        # for idx, output in enumerate(swapped_faces_images):
+        #     resized_image = resize_for_condition_image(output, 1.5)
+        #     resized_initial_output_images.append(resized_image)
 
-        if control_image and not disable_cn_second_pass:
-            # Resize condition images by 1.5
-            resized_control_images = []
-            for idx, control_image in enumerate(control_images):
-                resized_image = resize_for_condition_image(control_image, 1.5)
-                resized_control_images.append(resized_image)
+        # if control_image and not disable_cn_second_pass:
+        #     # Resize condition images by 1.5
+        #     resized_control_images = []
+        #     for idx, control_image in enumerate(control_images):
+        #         resized_image = resize_for_condition_image(control_image, 1.5)
+        #         resized_control_images.append(resized_image)
 
-        second_pass_images = []
-        second_pass_image_paths = []
-        if use_tile:
-            pipe = self.cnet_tile_pipe
-        elif control_image and not disable_cn_second_pass:
-            pipe = self.cnet_img2img_pipe
-        else:
-            pipe = self.img2img_pipe
+        # second_pass_images = []
+        # second_pass_image_paths = []
+        # if use_tile:
+        #     pipe = self.cnet_tile_pipe
+        # elif control_image and not disable_cn_second_pass:
+        #     pipe = self.cnet_img2img_pipe
+        # else:
+        #     pipe = self.img2img_pipe
 
-        pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
+        # pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 
-        # Run second passes
-        for idx, resized_initital_image in enumerate(resized_initial_output_images):
-            # Get new seed and generator
-            this_seed = seed + idx + 1000
-            generator = torch.Generator("cuda").manual_seed(this_seed)
+        # # Run second passes
+        # for idx, resized_initital_image in enumerate(resized_initial_output_images):
+        #     # Get new seed and generator
+        #     this_seed = seed + idx + 1000
+        #     generator = torch.Generator("cuda").manual_seed(this_seed)
 
-            # Pick a prompt round robin
-            prompt = prompts[idx % len(prompts)]
+        #     # Pick a prompt round robin
+        #     prompt = prompts[idx % len(prompts)]
 
-            if prompt:
-                conditioning = self.compel_proc.build_conditioning_tensor(prompt)
-                if not negative_prompt:
-                    negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
-                negative_conditioning = self.compel_proc.build_conditioning_tensor(
-                    negative_prompt
-                )
-                [
-                    prompt_embeds,
-                    negative_prompt_embeds,
-                ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
-                    [conditioning, negative_conditioning]
-                )
+        #     if prompt:
+        #         conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+        #         if not negative_prompt:
+        #             negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+        #         negative_conditioning = self.compel_proc.build_conditioning_tensor(
+        #             negative_prompt
+        #         )
+        #         [
+        #             prompt_embeds,
+        #             negative_prompt_embeds,
+        #         ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+        #             [conditioning, negative_conditioning]
+        #         )
 
-            second_pass_args = {
-                "prompt_embeds": prompt_embeds,
-                "negative_prompt_embeds": negative_prompt_embeds,
-                "guidance_scale": second_pass_guidance_scale,
-                "generator": generator,
-                "num_inference_steps": second_pass_steps,
-                "image": resized_initital_image,
-                "strength": second_pass_strength,
-            }
+        #     second_pass_args = {
+        #         "prompt_embeds": prompt_embeds,
+        #         "negative_prompt_embeds": negative_prompt_embeds,
+        #         "guidance_scale": second_pass_guidance_scale,
+        #         "generator": generator,
+        #         "num_inference_steps": second_pass_steps,
+        #         "image": resized_initital_image,
+        #         "strength": second_pass_strength,
+        #     }
 
-            # Debug: Print the type and size of 'resized_initital_image' to verify it's not None and correctly formatted
-            print("Type of 'resized_initital_image':", type(resized_initital_image))
-            if isinstance(resized_initital_image, Image.Image):
-                print("'resized_initital_image' size:", resized_initital_image.size)
+        #     # Debug: Print the type and size of 'resized_initital_image' to verify it's not None and correctly formatted
+        #     print("Type of 'resized_initital_image':", type(resized_initital_image))
+        #     if isinstance(resized_initital_image, Image.Image):
+        #         print("'resized_initital_image' size:", resized_initital_image.size)
 
-            if use_tile:
-                second_pass_args["control_image"] = resized_initital_image
+        #     if use_tile:
+        #         second_pass_args["control_image"] = resized_initital_image
 
-                # Debug: Verify the assignment
-                print("Using tile. 'control_image' set to 'resized_initital_image'")
-                if isinstance(resized_initital_image, Image.Image):
-                    print(
-                        "'control_image' size:",
-                        resized_initital_image.size,
-                    )
+        #         # Debug: Verify the assignment
+        #         print("Using tile. 'control_image' set to 'resized_initital_image'")
+        #         if isinstance(resized_initital_image, Image.Image):
+        #             print(
+        #                 "'control_image' size:",
+        #                 resized_initital_image.size,
+        #             )
 
-            elif control_image and not disable_cn_second_pass:
-                control_image = resized_control_images[idx % len(control_images)]
-                second_pass_args["control_image"] = control_image
+        #     elif control_image and not disable_cn_second_pass:
+        #         control_image = resized_control_images[idx % len(control_images)]
+        #         second_pass_args["control_image"] = control_image
 
-                # Debug: Print the type and size of 'control_image'
-                print("Type of 'control_image':", type(control_image))
-                if isinstance(control_image, Image.Image):
-                    print("'control_image' size:", control_image.size)
+        #         # Debug: Print the type and size of 'control_image'
+        #         print("Type of 'control_image':", type(control_image))
+        #         if isinstance(control_image, Image.Image):
+        #             print("'control_image' size:", control_image.size)
 
-            # Debug: Print final second_pass_args before passing to the pipeline
-            print("Final 'second_pass_args':")
-            for key, value in second_pass_args.items():
-                if isinstance(value, Image.Image):
-                    print(f"{key}: Image.Image of size {value.size}")
-                else:
-                    print(f"{key}: {type(value)}")
+        #     # Debug: Print final second_pass_args before passing to the pipeline
+        #     print("Final 'second_pass_args':")
+        #     for key, value in second_pass_args.items():
+        #         if isinstance(value, Image.Image):
+        #             print(f"{key}: Image.Image of size {value.size}")
+        #         else:
+        #             print(f"{key}: {type(value)}")
 
-            # print pipe inputs
-            print("pipe inputs:", second_pass_args)
+        #     # print pipe inputs
+        #     print("pipe inputs:", second_pass_args)
 
-            output = pipe(**second_pass_args)
+        #     output = pipe(**second_pass_args)
 
-            second_pass_images.append(output.images[0])
-            output_path = f"/tmp/second-pass-seed-{this_seed}.png"
-            output.images[0].save(output_path)
-            path_to_output = Path(output_path)
-            second_pass_image_paths.append(path_to_output)
-            if show_debug_images:
-                yield path_to_output
+        #     second_pass_images.append(output.images[0])
+        #     output_path = f"/tmp/second-pass-seed-{this_seed}.png"
+        #     output.images[0].save(output_path)
+        #     path_to_output = Path(output_path)
+        #     second_pass_image_paths.append(path_to_output)
+        #     if show_debug_images:
+        #         yield path_to_output
 
-        third_pass_image_paths = []
+        # third_pass_image_paths = []
 
-        for idx, image_path in enumerate(second_pass_image_paths):
-            upscaled_image_path = inference_app(
-                image=image_path,
-                background_enhance=upscale_background_enhance,
-                face_upsample=False,
-                upscale=upscale_final_size,
-                codeformer_fidelity=upscale_fidelity,
-            )
-            new_path = f"/tmp/second-pass-upscaled-{idx}.png"
-            shutil.copyfile(upscaled_image_path, new_path)
-            path_to_output = Path(new_path)
-            third_pass_image_paths.append(path_to_output)
+        # for idx, image_path in enumerate(second_pass_image_paths):
+        #     upscaled_image_path = inference_app(
+        #         image=image_path,
+        #         background_enhance=upscale_background_enhance,
+        #         face_upsample=False,
+        #         upscale=upscale_final_size,
+        #         codeformer_fidelity=upscale_fidelity,
+        #     )
+        #     new_path = f"/tmp/second-pass-upscaled-{idx}.png"
+        #     shutil.copyfile(upscaled_image_path, new_path)
+        #     path_to_output = Path(new_path)
+        #     third_pass_image_paths.append(path_to_output)
 
-            if show_debug_images:
-                yield path_to_output
+        #     if show_debug_images:
+        #         yield path_to_output
 
-        # Swap faces
-        # swapped_faces_images_paths = []
-        for idx, third_pass_image_path in enumerate(third_pass_image_paths):
-            # source_image_to_use = source_images[idx % len(source_images)]
+        # # Swap faces
+        # # swapped_faces_images_paths = []
+        # for idx, third_pass_image_path in enumerate(third_pass_image_paths):
+        #     # source_image_to_use = source_images[idx % len(source_images)]
 
-            # output_path = f"/tmp/seed-face-swap-{idx}.png"
-            # swapped_image = self.swap_face(third_pass_image_path, source_image_to_use)
-            # # Save swapped image and add path to swapped_faces_images
-            # swapped_image.save(output_path)
-            # swapped_image_path = Path(output_path)
-            # swapped_faces_images_paths.append(swapped_image_path)
+        #     # output_path = f"/tmp/seed-face-swap-{idx}.png"
+        #     # swapped_image = self.swap_face(third_pass_image_path, source_image_to_use)
+        #     # # Save swapped image and add path to swapped_faces_images
+        #     # swapped_image.save(output_path)
+        #     # swapped_image_path = Path(output_path)
+        #     # swapped_faces_images_paths.append(swapped_image_path)
 
-            # If show_debug_images or no upscale
-            # if show_debug_images:
-            #     yield swapped_image_path
+        #     # If show_debug_images or no upscale
+        #     # if show_debug_images:
+        #     #     yield swapped_image_path
 
-            if cf_acc_id and cf_api_key:
-                print("Uploading to Cloudflare...")
-                try:
-                    # uuid
-                    # image to use is upscaled_image_path if exists, else output_path
-                    image_to_use = third_pass_image_path
-                    id = str(uuid.uuid4())
-                    cf_url = upload_to_cloudflare(
-                        id,
-                        str(image_to_use),
-                        cf_acc_id,
-                        cf_api_key,
-                    )
-                    print("Uploaded to Cloudflare:", cf_url)
-                    yield cf_url
+        #     if cf_acc_id and cf_api_key:
+        #         print("Uploading to Cloudflare...")
+        #         try:
+        #             # uuid
+        #             # image to use is upscaled_image_path if exists, else output_path
+        #             image_to_use = third_pass_image_path
+        #             id = str(uuid.uuid4())
+        #             cf_url = upload_to_cloudflare(
+        #                 id,
+        #                 str(image_to_use),
+        #                 cf_acc_id,
+        #                 cf_api_key,
+        #             )
+        #             print("Uploaded to Cloudflare:", cf_url)
+        #             yield cf_url
 
-                    # # Watermark the image
-                    # watermarked_image_url = get_watermarked_image(
-                    #     cf_url,
-                    #     576,
-                    #     cf_acc_id,
-                    #     cf_api_key,
-                    # )
-                    # print("Watermarked image:", watermarked_image_url)
+        #             # # Watermark the image
+        #             # watermarked_image_url = get_watermarked_image(
+        #             #     cf_url,
+        #             #     576,
+        #             #     cf_acc_id,
+        #             #     cf_api_key,
+        #             # )
+        #             # print("Watermarked image:", watermarked_image_url)
 
-                    # Return the watermarked image
-                    # yield watermarked_image_url
-                except Exception as e:
-                    print("Failed to upload to Cloudflare", str(e))
-            else:
-                print("Not uploading to Cloudflare")
-                yield third_pass_image_path
+        #             # Return the watermarked image
+        #             # yield watermarked_image_url
+        #         except Exception as e:
+        #             print("Failed to upload to Cloudflare", str(e))
+        #     else:
+        #         print("Not uploading to Cloudflare")
+        #         yield third_pass_image_path

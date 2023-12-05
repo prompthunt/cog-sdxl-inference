@@ -640,6 +640,14 @@ class Predictor(BasePredictor):
             description="Source image for face swap",
             default=None,
         ),
+        disable_cn_second_pass: bool = Input(
+            description="Disable controlnet second pass",
+            default=False,
+        ),
+        use_tile: bool = Input(
+            description="Use tile",
+            default=False,
+        ),
         cf_acc_id: str = Input(
             description="Cloudflare account ID",
             default=None,
@@ -872,16 +880,18 @@ class Predictor(BasePredictor):
             resized_image = resize_for_condition_image(output, 1.5)
             resized_initial_output_images.append(resized_image)
 
-        # Resize condition images by 1.5
-        resized_control_images = []
-        for idx, control_image in enumerate(control_images):
-            resized_image = resize_for_condition_image(control_image, 1.5)
-            resized_control_images.append(resized_image)
+        if control_image and not disable_cn_second_pass:
+            # Resize condition images by 1.5
+            resized_control_images = []
+            for idx, control_image in enumerate(control_images):
+                resized_image = resize_for_condition_image(control_image, 1.5)
+                resized_control_images.append(resized_image)
 
         second_pass_images = []
         second_pass_image_paths = []
-
-        if control_image:
+        if use_tile:
+            pipe = self.cnet_tile_pipe
+        elif control_image and not disable_cn_second_pass:
             pipe = self.cnet_img2img_pipe
         else:
             pipe = self.img2img_pipe
@@ -921,7 +931,12 @@ class Predictor(BasePredictor):
                 "strength": second_pass_strength,
             }
 
-            if control_image:
+            if use_tile:
+                second_pass_args[
+                    "controlnet_conditioning_image"
+                ] = resized_initital_image
+
+            elif control_image and not disable_cn_second_pass:
                 control_image = resized_control_images[idx % len(control_images)]
                 second_pass_args["control_image"] = control_image
 

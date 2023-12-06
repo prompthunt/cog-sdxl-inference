@@ -525,6 +525,9 @@ class Predictor(BasePredictor):
             le=1.0,
             default=0.8,
         ),
+        pose_strength: float = Input(
+            description="Pose strength", ge=0, le=1, default=0.75
+        ),
         scheduler: str = Input(
             default="DPM++SDEKarras",
             choices=[
@@ -867,6 +870,7 @@ class Predictor(BasePredictor):
             elif control_image:
                 control_image = control_images[idx % len(control_images)]
                 extra_kwargs["image"] = control_image
+                extra_kwargs["controlnet_conditioning_scale"] = pose_strength
             elif image:
                 extra_kwargs["image"] = images[idx % len(images)]
                 extra_kwargs["strength"] = prompt_strengths[idx % len(prompt_strengths)]

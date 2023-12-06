@@ -1064,7 +1064,7 @@ class Predictor(BasePredictor):
             inpainted_image = self.inpaint_pipe(
                 prompt_embeds=prompt_embeds,
                 negative_prompt_embeds=negative_prompt_embeds,
-                image=cropped_face,
+                image=cropped_face_face_swapped,
                 mask_image=head_mask,
                 strength=inpaint_strength,
                 num_inference_steps=inpaint_steps,

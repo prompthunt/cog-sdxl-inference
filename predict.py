@@ -685,7 +685,7 @@ class Predictor(BasePredictor):
         #     default=3,
         # ),
         # Returns an object
-    ) -> List[Path]:
+    ) -> Any:
         # Object type
         """Run a single prediction on the model."""
         if seed is None:

@@ -225,7 +225,7 @@ def crop_faces_to_square(
     original_image: Image.Image,
     mask_image: Image.Image,
     padding: Optional[float] = 1.0,
-    resize_to: Optional[int] = 512,
+    resize_to: Optional[int] = 1024,
 ) -> Tuple[
     Image.Image, Image.Image, Optional[Image.Image], Tuple[int, int], Tuple[int, int]
 ]:
@@ -252,10 +252,6 @@ def crop_faces_to_square(
 
     print("left top 2", left_top)
     return image, mask, left_top, crop_size
-
-
-from PIL import Image
-from typing import Tuple, Optional
 
 
 def paste_inpaint_into_original_image(

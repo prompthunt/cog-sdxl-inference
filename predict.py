@@ -554,7 +554,7 @@ class Predictor(BasePredictor):
         ),
         upscale_final_size: int = Input(
             description="Upscale final size multiplier",
-            default=4,
+            default=2,
         ),
         upscale_fidelity: float = Input(
             description="Upscale codeformer fidelity",
@@ -989,27 +989,37 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield path_to_output
 
-        # Next step
-        # - get masks and locate faces
-        # - get head masks
-        # - run inpainting (face fix)
-        # - return result
+        # Run codeformer on all second pass images
+        for idx, second_pass_image_path in enumerate(second_pass_image_paths):
+            upscaled_image_path = inference_app(
+                image=second_pass_image_path,
+                background_enhance=upscale_background_enhance,
+                face_upsample=upscale_face_upsample,
+                upscale=upscale_final_size,
+                codeformer_fidelity=upscale_fidelity,
+            )
+            new_path = f"/tmp/codeformer-{idx}.png"
+            shutil.copyfile(upscaled_image_path, new_path)
+            path_to_output = Path(new_path)
+
+            codeformer_image_paths.append(path_to_output)
+            codeformer_images.append(load_image(new_path).convert("RGB"))
 
         # Get head mask for all second pass images
         second_pass_head_masks = []
         second_pass_head_masks_paths = []
 
         # These are the smaller ones
-        face_masks = face_mask_google_mediapipe(second_pass_images)
+        face_masks = face_mask_google_mediapipe(codeformer_images)
 
         # Get all head masks
-        for idx, second_pass_image in enumerate(second_pass_images):
+        for idx, codeformer_image in enumerate(codeformer_images):
             (
                 cropped_face,
                 cropped_mask,
                 left_top,
                 orig_size,
-            ) = crop_faces_to_square(second_pass_image, face_masks[idx], 1.5)
+            ) = crop_faces_to_square(codeformer_image, face_masks[idx], 1.5)
             head_mask = get_head_mask(cropped_face, mask_blur_amount)
             output_path = f"/tmp/second-pass-head-mask-{idx + 1}.png"
             head_mask.save(output_path)
@@ -1081,7 +1091,7 @@ class Predictor(BasePredictor):
             # yield inpainted_image_path
 
             pasted_image = paste_inpaint_into_original_image(
-                second_pass_image,
+                codeformer_image,
                 left_top,
                 cropped_face_face_swapped,
                 orig_size,

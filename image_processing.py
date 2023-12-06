@@ -254,6 +254,10 @@ def crop_faces_to_square(
     return image, mask, left_top, crop_size
 
 
+from PIL import Image
+from typing import Tuple, Optional
+
+
 def paste_inpaint_into_original_image(
     original_image: Image.Image,
     left_top: Tuple[int, int],
@@ -269,16 +273,32 @@ def paste_inpaint_into_original_image(
     :param image_to_paste: The image to paste into the original image.
     :return: The final merged image.
     """
+    # Debug: Print input parameters
+    print("Original Image Size:", original_image.size)
+    print("Left Top Coordinates:", left_top)
+    print("Paste Image Size:", image_to_paste.size)
+    print("Paste Size:", paste_size)
+
     # Resize the image to be pasted to the specified paste size
     image_to_paste = image_to_paste.resize(paste_size, Image.Resampling.LANCZOS)
 
+    # Debug: Print resized image size
+    print("Resized Image Size:", image_to_paste.size)
+
     # Create a copy of the original image to avoid modifying it directly
     final_image = original_image.copy()
+
+    # Debug: Print final_image size
+    print("Final Image Size:", final_image.size)
 
     # Prepare mask if provided
     if mask:
         mask = mask.resize(paste_size, Image.Resampling.LANCZOS)
         mask = mask.convert("L")
+
+    # Debug: Print mask size (if provided)
+    if mask:
+        print("Mask Size:", mask.size)
 
     # Paste the new image into the original image at the specified coordinates and using the mask
     final_image.paste(image_to_paste, left_top, mask)

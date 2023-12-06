@@ -1024,9 +1024,10 @@ class Predictor(BasePredictor):
             cropped_mask.save(cropped_mask_output_path)
             cropped_mask_path = Path(cropped_mask_output_path)
 
-            yield Path(cropped_mask_path)
-            yield Path(cropped_face_path)
-            yield Path(output_path)
+            if show_debug_images:
+                yield Path(cropped_mask_path)
+                yield Path(cropped_face_path)
+                yield Path(output_path)
 
             # this_seed = seed + idx + 2000
             # generator = torch.Generator("cuda").manual_seed(this_seed)
@@ -1045,7 +1046,8 @@ class Predictor(BasePredictor):
             )
             cropped_face_face_swapped.save(cropped_face_face_swapped_output_path)
             cropped_face_face_swapped_path = Path(cropped_face_face_swapped_output_path)
-            yield cropped_face_face_swapped_path
+            if show_debug_images:
+                yield cropped_face_face_swapped_path
 
             # if prompt:
             #     conditioning = self.compel_proc.build_conditioning_tensor(prompt)
@@ -1087,11 +1089,45 @@ class Predictor(BasePredictor):
                 orig_size,
                 head_mask,
             )
-            pasted_image_output_path = f"/tmp/second-pass-pasted-image-{idx + 1}.png"
+            pasted_image_output_path = (
+                f"/tmp/second-pass-face-swapped-face-{idx + 1}.png"
+            )
             pasted_image.save(pasted_image_output_path)
             pasted_image_path = Path(pasted_image_output_path)
+            second_pass_face_swapped_image_paths.append(pasted_image_path)
 
-            yield pasted_image_path
+            if show_debug_images:
+                yield pasted_image_path
+
+            upscaled_image_path = inference_app(
+                image=pasted_image_path,
+                background_enhance=True,
+                face_upsample=False,
+                upscale=upscale_final_size,
+                codeformer_fidelity=upscale_fidelity,
+            )
+            new_path = f"/tmp/codeformer-{idx + 1}.png"
+            shutil.copyfile(upscaled_image_path, new_path)
+            path_to_output = Path(new_path)
+            if show_debug_images:
+                yield path_to_output
+
+            codeformer_image_paths.append(path_to_output)
+
+            upscaled_image_path_with_face_enhance = inference_app(
+                image=pasted_image_path,
+                background_enhance=True,
+                face_upsample=True,
+                upscale=upscale_final_size,
+                codeformer_fidelity=upscale_fidelity,
+            )
+            new_path = f"/tmp/codeformer-face-swapped-face-{idx + 1}.png"
+            shutil.copyfile(upscaled_image_path_with_face_enhance, new_path)
+            path_to_output = Path(new_path)
+            codeformer_face_swapped_image_paths.append(path_to_output)
+
+            if show_debug_images:
+                yield path_to_output
 
         # # Codeformer upscale all second pass images
         # for idx, image_path in enumerate(second_pass_image_paths):
@@ -1142,26 +1178,26 @@ class Predictor(BasePredictor):
         # Output is object with key value pairs key being filename and value being cloudflare uploaded url
         final_output = {}
 
-        # # Upload to cloudflare
-        # if cf_acc_id and cf_api_key:
-        #     for image_path in all_image_paths:
-        #         try:
-        #             # Id is uuid + the image filename
-        #             filename = str(image_path).split("/")[-1]
-        #             id = str(uuid.uuid4()) + "-" + filename
-        #             cf_url = upload_to_cloudflare(
-        #                 id,
-        #                 str(image_path),
-        #                 cf_acc_id,
-        #                 cf_api_key,
-        #             )
-        #             print("Uploaded to Cloudflare:", cf_url)
-        #             final_output[filename] = cf_url
-        #         except Exception as e:
-        #             print("Failed to upload to Cloudflare", str(e))
+        # Upload to cloudflare
+        if cf_acc_id and cf_api_key:
+            for image_path in all_image_paths:
+                try:
+                    # Id is uuid + the image filename
+                    filename = str(image_path).split("/")[-1]
+                    id = str(uuid.uuid4()) + "-" + filename
+                    cf_url = upload_to_cloudflare(
+                        id,
+                        str(image_path),
+                        cf_acc_id,
+                        cf_api_key,
+                    )
+                    print("Uploaded to Cloudflare:", cf_url)
+                    final_output[filename] = cf_url
+                except Exception as e:
+                    print("Failed to upload to Cloudflare", str(e))
 
         # Return the final output
-        # yield final_output
+        yield final_output
 
         # if cf_acc_id and cf_api_key:
         #     print("Uploading to Cloudflare...")

@@ -669,21 +669,21 @@ class Predictor(BasePredictor):
         mask_blur_amount: float = Input(
             description="Amount of blur to apply to the mask.", default=8.0
         ),
-        inpaint_strength: float = Input(
-            description="Strength of inpainting", ge=0.0, le=1.0, default=0.5
-        ),
-        inpaint_steps: int = Input(
-            description="Number of denoising steps for inpainting",
-            ge=1,
-            le=500,
-            default=40,
-        ),
-        inpaint_guidance_scale: float = Input(
-            description="Scale for classifier-free guidance for inpainting",
-            ge=1,
-            le=50,
-            default=3,
-        ),
+        # inpaint_strength: float = Input(
+        #     description="Strength of inpainting", ge=0.0, le=1.0, default=0.5
+        # ),
+        # inpaint_steps: int = Input(
+        #     description="Number of denoising steps for inpainting",
+        #     ge=1,
+        #     le=500,
+        #     default=40,
+        # ),
+        # inpaint_guidance_scale: float = Input(
+        #     description="Scale for classifier-free guidance for inpainting",
+        #     ge=1,
+        #     le=50,
+        #     default=3,
+        # ),
         # Returns an object
     ) -> List[Path]:
         # Object type
@@ -1024,17 +1024,17 @@ class Predictor(BasePredictor):
             cropped_mask.save(cropped_mask_output_path)
             cropped_mask_path = Path(cropped_mask_output_path)
 
-            yield Path(cropped_face_path)
             yield Path(cropped_mask_path)
+            yield Path(cropped_face_path)
             yield Path(output_path)
 
-            this_seed = seed + idx + 2000
-            generator = torch.Generator("cuda").manual_seed(this_seed)
-            print(f"Prompt: {prompt}")
-            print(f"Negative Prompt: {negative_prompt}")
+            # this_seed = seed + idx + 2000
+            # generator = torch.Generator("cuda").manual_seed(this_seed)
+            # print(f"Prompt: {prompt}")
+            # print(f"Negative Prompt: {negative_prompt}")
 
-            # Pick a prompt round robin
-            prompt = prompts[idx % len(prompts)]
+            # # Pick a prompt round robin
+            # prompt = prompts[idx % len(prompts)]
 
             # cropped face face swap
             cropped_face_face_swapped = self.swap_face(
@@ -1047,38 +1047,38 @@ class Predictor(BasePredictor):
             cropped_face_face_swapped_path = Path(cropped_face_face_swapped_output_path)
             yield cropped_face_face_swapped_path
 
-            if prompt:
-                conditioning = self.compel_proc.build_conditioning_tensor(prompt)
-                if not negative_prompt:
-                    negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
-                negative_conditioning = self.compel_proc.build_conditioning_tensor(
-                    negative_prompt
-                )
-                [
-                    prompt_embeds,
-                    negative_prompt_embeds,
-                ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
-                    [conditioning, negative_conditioning]
-                )
+            # if prompt:
+            #     conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+            #     if not negative_prompt:
+            #         negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+            #     negative_conditioning = self.compel_proc.build_conditioning_tensor(
+            #         negative_prompt
+            #     )
+            #     [
+            #         prompt_embeds,
+            #         negative_prompt_embeds,
+            #     ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+            #         [conditioning, negative_conditioning]
+            #     )
 
-            inpainted_image = self.inpaint_pipe(
-                prompt_embeds=prompt_embeds,
-                negative_prompt_embeds=negative_prompt_embeds,
-                image=cropped_face_face_swapped,
-                mask_image=head_mask,
-                strength=inpaint_strength,
-                num_inference_steps=inpaint_steps,
-                guidance_scale=inpaint_guidance_scale,
-                generator=generator,
-            ).images[0]
+            # inpainted_image = self.inpaint_pipe(
+            #     prompt_embeds=prompt_embeds,
+            #     negative_prompt_embeds=negative_prompt_embeds,
+            #     image=cropped_face_face_swapped,
+            #     mask_image=head_mask,
+            #     strength=inpaint_strength,
+            #     num_inference_steps=inpaint_steps,
+            #     guidance_scale=inpaint_guidance_scale,
+            #     generator=generator,
+            # ).images[0]
 
-            inpainted_image_output_path = (
-                f"/tmp/second-pass-inpainted-image-{idx + 1}.png"
-            )
-            inpainted_image.save(inpainted_image_output_path)
-            inpainted_image_path = Path(inpainted_image_output_path)
+            # inpainted_image_output_path = (
+            #     f"/tmp/second-pass-inpainted-image-{idx + 1}.png"
+            # )
+            # inpainted_image.save(inpainted_image_output_path)
+            # inpainted_image_path = Path(inpainted_image_output_path)
 
-            yield inpainted_image_path
+            # yield inpainted_image_path
 
             pasted_image = paste_inpaint_into_original_image(
                 second_pass_image,

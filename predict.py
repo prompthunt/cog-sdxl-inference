@@ -1080,6 +1080,19 @@ class Predictor(BasePredictor):
 
             yield inpainted_image_path
 
+            pasted_image = paste_inpaint_into_original_image(
+                second_pass_image,
+                left_top,
+                cropped_face_face_swapped,
+                orig_size,
+                head_mask,
+            )
+            pasted_image_output_path = f"/tmp/second-pass-pasted-image-{idx + 1}.png"
+            pasted_image.save(pasted_image_output_path)
+            pasted_image_path = Path(pasted_image_output_path)
+
+            yield pasted_image_path
+
         # # Codeformer upscale all second pass images
         # for idx, image_path in enumerate(second_pass_image_paths):
         #     upscaled_image_path = inference_app(

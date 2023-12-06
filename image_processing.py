@@ -259,6 +259,7 @@ def paste_inpaint_into_original_image(
     left_top: Tuple[int, int],
     image_to_paste: Image.Image,
     paste_size: Tuple[int, int],
+    mask: Optional[Image.Image] = None,
 ) -> Image.Image:
     """
     Paste an image back into its original position in the larger image.
@@ -274,8 +275,13 @@ def paste_inpaint_into_original_image(
     # Create a copy of the original image to avoid modifying it directly
     final_image = original_image.copy()
 
+    # Prepare mask if provided
+    if mask:
+        mask = mask.resize(paste_size, Image.Resampling.LANCZOS)
+        mask = mask.convert("L")
+
     # Paste the new image into the original image at the specified coordinates and using the mask
-    final_image.paste(image_to_paste, left_top)
+    final_image.paste(image_to_paste, left_top, mask)
 
     return final_image
 

@@ -995,6 +995,16 @@ class Predictor(BasePredictor):
             second_pass_head_masks_paths.append(Path(output_path))
             yield Path(output_path)
 
+            # Upscale face
+            upscaled_face = self.upscale_image_pil(cropped_face)
+
+            # Paste upscaled face back into original image
+            pasted_face_image = paste_inpaint_into_original_image(
+                second_pass_image, left_top, upscaled_face, orig_size, head_mask
+            )
+
+            yield pasted_face_image
+
         # # Codeformer upscale all second pass images
         # for idx, image_path in enumerate(second_pass_image_paths):
         #     upscaled_image_path = inference_app(

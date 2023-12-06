@@ -1036,6 +1036,17 @@ class Predictor(BasePredictor):
             # Pick a prompt round robin
             prompt = prompts[idx % len(prompts)]
 
+            # cropped face face swap
+            cropped_face_face_swapped = self.swap_face(
+                cropped_face_path, source_images[idx % len(source_images)]
+            )
+            cropped_face_face_swapped_output_path = (
+                f"/tmp/second-pass-cropped-face-face-swapped-{idx + 1}.png"
+            )
+            cropped_face_face_swapped.save(cropped_face_face_swapped_output_path)
+            cropped_face_face_swapped_path = Path(cropped_face_face_swapped_output_path)
+            yield cropped_face_face_swapped_path
+
             if prompt:
                 conditioning = self.compel_proc.build_conditioning_tensor(prompt)
                 if not negative_prompt:

@@ -49,7 +49,12 @@ import onnxruntime
 from insightface.app import FaceAnalysis
 from codeformer.app import inference_app
 
-from image_processing import get_head_mask
+from image_processing import (
+    face_mask_google_mediapipe,
+    crop_faces_to_square,
+    paste_inpaint_into_original_image,
+    get_head_mask,
+)
 
 
 def resize_for_condition_image(input_image: Image, k: float):
@@ -658,6 +663,9 @@ class Predictor(BasePredictor):
             description="Cloudflare API key",
             default=None,
         ),
+        mask_blur_amount: float = Input(
+            description="Amount of blur to apply to the mask.", default=8.0
+        ),
         # Returns an object
     ) -> List[Path]:
         # Object type
@@ -967,9 +975,20 @@ class Predictor(BasePredictor):
         second_pass_head_masks = []
         second_pass_head_masks_paths = []
 
+        face_masks = face_mask_google_mediapipe(second_pass_images)
+
         # Get all head masks
         for idx, second_pass_image in enumerate(second_pass_images):
-            head_mask = get_head_mask(second_pass_image)
+            (
+                cropped_face,
+                cropped_mask,
+                left_top,
+                orig_size,
+            ) = crop_faces_to_square(
+                second_pass_image,
+                face_masks[idx],
+            )
+            head_mask = get_head_mask(cropped_face, mask_blur_amount)
             output_path = f"/tmp/second-pass-head-mask-{idx + 1}.png"
             head_mask.save(output_path)
             second_pass_head_masks.append(head_mask)

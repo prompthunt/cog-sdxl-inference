@@ -24,6 +24,7 @@ build:
     - "tensorrt"
     - "timm"
     - "requests-toolbelt"
+    - "mediapipe"
 
   run:
     - curl -o /usr/local/bin/pget -L "https://github.com/replicate/pget/releases/download/v0.0.1/pget" && chmod +x /usr/local/bin/pget
@@ -34,6 +35,6 @@ build:
     - "unzip buffalo_l.zip -d ~/.insightface/models/buffalo_l"
     - "pip install git+https://github.com/patrickvonplaten/controlnet_aux.git@dfb604120af6e5acf21936f79aecb046d0faaa29"
     - pip install git+https://github.com/wiktorlazarski/head-segmentation.git
-
+    - wget http://thegiflibrary.tumblr.com/post/11565547760 -O face_landmarker_v2_with_blendshapes.task -q https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
 
 predict: "predict.py:Predictor"

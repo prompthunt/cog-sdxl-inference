@@ -669,6 +669,21 @@ class Predictor(BasePredictor):
         mask_blur_amount: float = Input(
             description="Amount of blur to apply to the mask.", default=8.0
         ),
+        inpaint_strength: float = Input(
+            description="Strength of inpainting", ge=0.0, le=1.0, default=0.5
+        ),
+        inpaint_steps: int = Input(
+            description="Number of denoising steps for inpainting",
+            ge=1,
+            le=500,
+            default=40,
+        ),
+        inpaint_guidance_scale: float = Input(
+            description="Scale for classifier-free guidance for inpainting",
+            ge=1,
+            le=50,
+            default=3,
+        ),
         # Returns an object
     ) -> List[Path]:
         # Object type
@@ -974,10 +989,17 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield path_to_output
 
+        # Next step
+        # - get masks and locate faces
+        # - get head masks
+        # - run inpainting (face fix)
+        # - return result
+
         # Get head mask for all second pass images
         second_pass_head_masks = []
         second_pass_head_masks_paths = []
 
+        # These are the smaller ones
         face_masks = face_mask_google_mediapipe(second_pass_images)
 
         # Get all head masks
@@ -987,34 +1009,65 @@ class Predictor(BasePredictor):
                 cropped_mask,
                 left_top,
                 orig_size,
-            ) = crop_faces_to_square(
-                second_pass_image,
-                face_masks[idx],
-            )
+            ) = crop_faces_to_square(second_pass_image, face_masks[idx], 1.5)
             head_mask = get_head_mask(cropped_face, mask_blur_amount)
             output_path = f"/tmp/second-pass-head-mask-{idx + 1}.png"
             head_mask.save(output_path)
             second_pass_head_masks.append(head_mask)
             second_pass_head_masks_paths.append(Path(output_path))
+
+            cropped_face_output_path = f"/tmp/second-pass-cropped-face-{idx + 1}.png"
+            cropped_face.save(cropped_face_output_path)
+            cropped_face_path = Path(cropped_face_output_path)
+
+            cropped_mask_output_path = f"/tmp/second-pass-cropped-mask-{idx + 1}.png"
+            cropped_mask.save(cropped_mask_output_path)
+            cropped_mask_path = Path(cropped_mask_output_path)
+
+            yield Path(cropped_face_path)
+            yield Path(cropped_mask_path)
             yield Path(output_path)
 
-            print("UPSCALING IMAGE")
+            this_seed = seed + idx + 2000
+            generator = torch.Generator("cuda").manual_seed(this_seed)
+            print(f"Prompt: {prompt}")
+            print(f"Negative Prompt: {negative_prompt}")
 
-            # Upscale face
-            upscaled_face = self.upscale_image_pil(cropped_face)
+            # Pick a prompt round robin
+            prompt = prompts[idx % len(prompts)]
 
-            print("PASTING IMAGE")
+            if prompt:
+                conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+                if not negative_prompt:
+                    negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+                negative_conditioning = self.compel_proc.build_conditioning_tensor(
+                    negative_prompt
+                )
+                [
+                    prompt_embeds,
+                    negative_prompt_embeds,
+                ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+                    [conditioning, negative_conditioning]
+                )
 
-            # Paste upscaled face back into original image
-            pasted_face_image = paste_inpaint_into_original_image(
-                second_pass_image, left_top, upscaled_face, orig_size, head_mask
+            inpainted_image = self.inpaint_pipe(
+                prompt_embeds=prompt_embeds,
+                negative_prompt_embeds=negative_prompt_embeds,
+                image=cropped_face,
+                mask_image=head_mask,
+                strength=inpaint_strength,
+                num_inference_steps=inpaint_steps,
+                guidance_scale=inpaint_guidance_scale,
+                generator=generator,
+            ).images[0]
+
+            inpainted_image_output_path = (
+                f"/tmp/second-pass-inpainted-image-{idx + 1}.png"
             )
+            inpainted_image.save(inpainted_image_output_path)
+            inpainted_image_path = Path(inpainted_image_output_path)
 
-            print("DONE PASTING IMAGE")
-
-            output_path = f"/tmp/upscaled_pasted-{idx + 1}.png"
-            pasted_face_image.save(output_path)
-            yield Path(output_path)
+            yield inpainted_image_path
 
         # # Codeformer upscale all second pass images
         # for idx, image_path in enumerate(second_pass_image_paths):

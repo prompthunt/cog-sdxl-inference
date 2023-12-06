@@ -135,10 +135,13 @@ class Predictor(BasePredictor):
                 weight=weight,
             )
 
-            # Convert numpy array back to PIL Image
-            output = Image.fromarray(output)
+            # Convert from BGR to RGB
+            output_rgb = cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
 
-            return output
+            # Convert numpy array back to PIL Image
+            pil_image = Image.fromarray(output_rgb)
+
+            return pil_image
 
         except Exception as error:
             print("An exception occurred:", error)
@@ -1081,7 +1084,7 @@ class Predictor(BasePredictor):
         #             print("Failed to upload to Cloudflare", str(e))
 
         # Return the final output
-        yield final_output
+        # yield final_output
 
         # if cf_acc_id and cf_api_key:
         #     print("Uploading to Cloudflare...")

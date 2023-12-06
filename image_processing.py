@@ -303,6 +303,8 @@ def paste_inpaint_into_original_image(
     # Paste the new image into the original image at the specified coordinates and using the mask
     final_image.paste(image_to_paste, left_top, mask)
 
+    print("Final Image Size:", final_image.size)
+
     return final_image
 
 

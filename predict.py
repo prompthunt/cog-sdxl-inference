@@ -49,6 +49,8 @@ import onnxruntime
 from insightface.app import FaceAnalysis
 from codeformer.app import inference_app
 
+from image_processing import get_head_mask
+
 
 def resize_for_condition_image(input_image: Image, k: float):
     input_image = input_image.convert("RGB")
@@ -657,7 +659,7 @@ class Predictor(BasePredictor):
             default=None,
         ),
         # Returns an object
-    ) -> Any:
+    ) -> List[Path]:
         # Object type
         """Run a single prediction on the model."""
         if seed is None:
@@ -961,54 +963,52 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield path_to_output
 
-        for idx, second_pass_image_path in enumerate(second_pass_image_paths):
-            source_image_to_use = source_images[idx % len(source_images)]
+        # Get head mask for all second pass images
+        second_pass_head_masks = []
+        second_pass_head_masks_paths = []
 
-            output_path = f"/tmp/second-pass-face-swapped-face-{idx + 1}.png"
-            swapped_image = self.swap_face(second_pass_image_path, source_image_to_use)
-            # Save swapped image and add path to swapped_faces_images
-            swapped_image.save(output_path)
-            swapped_image_path = Path(output_path)
-            second_pass_face_swapped_images.append(swapped_image)
-            second_pass_face_swapped_image_paths.append(swapped_image_path)
+        # Get all head masks
+        for idx, second_pass_image in enumerate(second_pass_images):
+            head_mask = get_head_mask(second_pass_image)
+            output_path = f"/tmp/second-pass-head-mask-{idx + 1}.png"
+            head_mask.save(output_path)
+            second_pass_head_masks.append(head_mask)
+            second_pass_head_masks_paths.append(Path(output_path))
+            yield Path(output_path)
 
-            # If show_debug_images or no upscale
-            if show_debug_images:
-                yield swapped_image_path
+        # # Codeformer upscale all second pass images
+        # for idx, image_path in enumerate(second_pass_image_paths):
+        #     upscaled_image_path = inference_app(
+        #         image=image_path,
+        #         background_enhance=False,
+        #         face_upsample=False,
+        #         upscale=upscale_final_size,
+        #         codeformer_fidelity=upscale_fidelity,
+        #     )
+        #     new_path = f"/tmp/codeformer-{idx}.png"
+        #     shutil.copyfile(upscaled_image_path, new_path)
+        #     path_to_output = Path(new_path)
 
-        # Codeformer upscale all second pass images
-        for idx, image_path in enumerate(second_pass_image_paths):
-            upscaled_image_path = inference_app(
-                image=image_path,
-                background_enhance=False,
-                face_upsample=False,
-                upscale=upscale_final_size,
-                codeformer_fidelity=upscale_fidelity,
-            )
-            new_path = f"/tmp/codeformer-{idx}.png"
-            shutil.copyfile(upscaled_image_path, new_path)
-            path_to_output = Path(new_path)
+        #     codeformer_image_paths.append(path_to_output)
 
-            codeformer_image_paths.append(path_to_output)
+        #     if show_debug_images:
+        #         yield path_to_output
 
-            if show_debug_images:
-                yield path_to_output
+        # # Swap faces on all codeformer images
+        # for idx, codeformer_image_path in enumerate(codeformer_image_paths):
+        #     source_image_to_use = source_images[idx % len(source_images)]
 
-        # Swap faces on all codeformer images
-        for idx, codeformer_image_path in enumerate(codeformer_image_paths):
-            source_image_to_use = source_images[idx % len(source_images)]
+        #     output_path = f"/tmp/codeformer-face-swapped-face-{idx + 1}.png"
+        #     swapped_image = self.swap_face(codeformer_image_path, source_image_to_use)
+        #     # Save swapped image and add path to swapped_faces_images
+        #     swapped_image.save(output_path)
+        #     swapped_image_path = Path(output_path)
+        #     codeformer_face_swapped_images.append(swapped_image)
+        #     codeformer_face_swapped_image_paths.append(swapped_image_path)
 
-            output_path = f"/tmp/codeformer-face-swapped-face-{idx + 1}.png"
-            swapped_image = self.swap_face(codeformer_image_path, source_image_to_use)
-            # Save swapped image and add path to swapped_faces_images
-            swapped_image.save(output_path)
-            swapped_image_path = Path(output_path)
-            codeformer_face_swapped_images.append(swapped_image)
-            codeformer_face_swapped_image_paths.append(swapped_image_path)
-
-            # If show_debug_images or no upscale
-            if show_debug_images:
-                yield swapped_image_path
+        #     # If show_debug_images or no upscale
+        #     if show_debug_images:
+        #         yield swapped_image_path
 
         # # Upload all outputs to Cloudflare
 
@@ -1025,23 +1025,23 @@ class Predictor(BasePredictor):
         # Output is object with key value pairs key being filename and value being cloudflare uploaded url
         final_output = {}
 
-        # Upload to cloudflare
-        if cf_acc_id and cf_api_key:
-            for image_path in all_image_paths:
-                try:
-                    # Id is uuid + the image filename
-                    filename = str(image_path).split("/")[-1]
-                    id = str(uuid.uuid4()) + "-" + filename
-                    cf_url = upload_to_cloudflare(
-                        id,
-                        str(image_path),
-                        cf_acc_id,
-                        cf_api_key,
-                    )
-                    print("Uploaded to Cloudflare:", cf_url)
-                    final_output[filename] = cf_url
-                except Exception as e:
-                    print("Failed to upload to Cloudflare", str(e))
+        # # Upload to cloudflare
+        # if cf_acc_id and cf_api_key:
+        #     for image_path in all_image_paths:
+        #         try:
+        #             # Id is uuid + the image filename
+        #             filename = str(image_path).split("/")[-1]
+        #             id = str(uuid.uuid4()) + "-" + filename
+        #             cf_url = upload_to_cloudflare(
+        #                 id,
+        #                 str(image_path),
+        #                 cf_acc_id,
+        #                 cf_api_key,
+        #             )
+        #             print("Uploaded to Cloudflare:", cf_url)
+        #             final_output[filename] = cf_url
+        #         except Exception as e:
+        #             print("Failed to upload to Cloudflare", str(e))
 
         # Return the final output
         yield final_output

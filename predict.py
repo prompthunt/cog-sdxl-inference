@@ -1004,6 +1004,7 @@ class Predictor(BasePredictor):
 
             codeformer_image_paths.append(path_to_output)
             codeformer_images.append(load_image(new_path).convert("RGB"))
+            yield path_to_output
 
         # Get head mask for all second pass images
         second_pass_head_masks = []

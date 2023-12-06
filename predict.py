@@ -1007,7 +1007,11 @@ class Predictor(BasePredictor):
                 second_pass_image, left_top, upscaled_face, orig_size, head_mask
             )
 
-            yield pasted_face_image
+            print("DONE PASTING IMAGE")
+
+            output_path = f"/tmp/upscaled_pasted-{idx + 1}.png"
+            pasted_face_image.save(output_path)
+            yield Path(output_path)
 
         # # Codeformer upscale all second pass images
         # for idx, image_path in enumerate(second_pass_image_paths):

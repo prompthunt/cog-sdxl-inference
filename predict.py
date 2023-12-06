@@ -977,7 +977,7 @@ class Predictor(BasePredictor):
                 yield swapped_image_path
 
         # Codeformer upscale all second pass images
-        for idx, image_path in enumerate(second_pass_image_paths):
+        for idx, image_path in enumerate(second_pass_face_swapped_image_paths):
             upscaled_image_path = inference_app(
                 image=image_path,
                 background_enhance=False,

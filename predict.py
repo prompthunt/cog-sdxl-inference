@@ -995,8 +995,12 @@ class Predictor(BasePredictor):
             second_pass_head_masks_paths.append(Path(output_path))
             yield Path(output_path)
 
+            print("UPSCALING IMAGE")
+
             # Upscale face
             upscaled_face = self.upscale_image_pil(cropped_face)
+
+            print("PASTING IMAGE")
 
             # Paste upscaled face back into original image
             pasted_face_image = paste_inpaint_into_original_image(

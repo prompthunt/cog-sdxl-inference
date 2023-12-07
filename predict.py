@@ -921,20 +921,20 @@ class Predictor(BasePredictor):
         #     if show_debug_images:
         #         yield swapped_image_path
 
-        # Resize all initial images by 2, these will be used as base images for second pass
+        # Resize all initial images by 1.5, these will be used as base images for second pass
         resized_first_pass_images = []
         for idx, first_pass_image in enumerate(first_pass_images):
-            resized_image = resize_for_condition_image(first_pass_image, 2)
+            resized_image = resize_for_condition_image(first_pass_image, 1.5)
             resized_first_pass_images.append(resized_image)
 
         # Resize all pose images too
         resized_control_images = []
         for idx, control_image in enumerate(control_images):
-            resized_control_image = resize_for_condition_image(control_image, 2)
+            resized_control_image = resize_for_condition_image(control_image, 1.5)
             resized_control_images.append(resized_control_image)
 
         # Set up pipiline for second pass
-        pipe = self.cnet_tile_pipe
+        pipe = self.cnet_img2img_pipe
         # Set up scheduler on new pipeline
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 
@@ -969,15 +969,12 @@ class Predictor(BasePredictor):
                 "num_inference_steps": second_pass_steps,
                 "image": resized_first_pass_image,
                 "strength": second_pass_strength,
-                "control_image": resized_first_pass_image,
+                "control_image": resized_control_images[
+                    idx % len(resized_control_images)
+                ],
                 "width": resized_first_pass_image.size[0],
-                "height":resized_first_pass_image.size[1],
+                "height": resized_first_pass_image.size[1],
             }
-
-
-        #    if control_image and not disable_cn_second_pass:
-        #         control_image = resized_control_images[idx % len(control_images)]
-        #         second_pass_args["control_image"] = control_image
 
             # Debug: Print final second_pass_args before passing to the pipeline
             print("Final 'second_pass_args':")
@@ -1110,35 +1107,35 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield pasted_image_path
 
-            upscaled_image_path = inference_app(
-                image=pasted_image_path,
-                background_enhance=True,
-                face_upsample=False,
-                upscale=upscale_final_size,
-                codeformer_fidelity=upscale_fidelity,
-            )
-            new_path = f"/tmp/codeformer-{idx + 1}.png"
-            shutil.copyfile(upscaled_image_path, new_path)
-            path_to_output = Path(new_path)
-            if show_debug_images:
-                yield path_to_output
+            # upscaled_image_path = inference_app(
+            #     image=pasted_image_path,
+            #     background_enhance=True,
+            #     face_upsample=False,
+            #     upscale=upscale_final_size,
+            #     codeformer_fidelity=upscale_fidelity,
+            # )
+            # new_path = f"/tmp/codeformer-{idx + 1}.png"
+            # shutil.copyfile(upscaled_image_path, new_path)
+            # path_to_output = Path(new_path)
+            # if show_debug_images:
+            #     yield path_to_output
 
-            codeformer_image_paths.append(path_to_output)
+            # codeformer_image_paths.append(path_to_output)
 
-            upscaled_image_path_with_face_enhance = inference_app(
-                image=pasted_image_path,
-                background_enhance=True,
-                face_upsample=True,
-                upscale=upscale_final_size,
-                codeformer_fidelity=upscale_fidelity,
-            )
-            new_path = f"/tmp/codeformer-face-swapped-face-{idx + 1}.png"
-            shutil.copyfile(upscaled_image_path_with_face_enhance, new_path)
-            path_to_output = Path(new_path)
-            codeformer_face_swapped_image_paths.append(path_to_output)
+            # upscaled_image_path_with_face_enhance = inference_app(
+            #     image=pasted_image_path,
+            #     background_enhance=True,
+            #     face_upsample=True,
+            #     upscale=upscale_final_size,
+            #     codeformer_fidelity=upscale_fidelity,
+            # )
+            # new_path = f"/tmp/codeformer-face-swapped-face-{idx + 1}.png"
+            # shutil.copyfile(upscaled_image_path_with_face_enhance, new_path)
+            # path_to_output = Path(new_path)
+            # codeformer_face_swapped_image_paths.append(path_to_output)
 
-            if show_debug_images:
-                yield path_to_output
+            # if show_debug_images:
+            #     yield path_to_output
 
         # # Codeformer upscale all second pass images
         # for idx, image_path in enumerate(second_pass_image_paths):

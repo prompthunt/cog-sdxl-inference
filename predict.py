@@ -906,24 +906,24 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield path_to_output
 
-        # Swap faces on all first pass images
-        for idx, first_pass_image_path in enumerate(first_pass_image_paths):
-            source_image_to_use = source_images[idx % len(source_images)]
+        # # Swap faces on all first pass images
+        # for idx, first_pass_image_path in enumerate(first_pass_image_paths):
+        #     source_image_to_use = source_images[idx % len(source_images)]
 
-            output_path = f"/tmp/first-pass-face-swapped-face-{idx + 1}.png"
-            swapped_image = self.swap_face(first_pass_image_path, source_image_to_use)
-            # Save swapped image and add path to first_pass_face_swapped_images
-            swapped_image.save(output_path)
-            swapped_image_path = Path(output_path)
-            first_pass_face_swapped_images.append(swapped_image)
-            first_pass_face_swapped_image_paths.append(swapped_image_path)
-            # If show_debug_images or no upscale
-            if show_debug_images:
-                yield swapped_image_path
+        #     output_path = f"/tmp/first-pass-face-swapped-face-{idx + 1}.png"
+        #     swapped_image = self.swap_face(first_pass_image_path, source_image_to_use)
+        #     # Save swapped image and add path to first_pass_face_swapped_images
+        #     swapped_image.save(output_path)
+        #     swapped_image_path = Path(output_path)
+        #     first_pass_face_swapped_images.append(swapped_image)
+        #     first_pass_face_swapped_image_paths.append(swapped_image_path)
+        #     # If show_debug_images or no upscale
+        #     if show_debug_images:
+        #         yield swapped_image_path
 
         # Resize all initial images by 2, these will be used as base images for second pass
         resized_first_pass_images = []
-        for idx, first_pass_image in enumerate(first_pass_face_swapped_images):
+        for idx, first_pass_image in enumerate(first_pass_images):
             resized_image = resize_for_condition_image(first_pass_image, 2)
             resized_first_pass_images.append(resized_image)
 

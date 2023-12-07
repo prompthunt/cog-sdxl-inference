@@ -420,7 +420,7 @@ class Predictor(BasePredictor):
 
         print("Loading pose controlnet...")
         controlnet = ControlNetModel.from_pretrained(
-            "lllyasviel/sd-controlnet-openpose",
+            "lllyasviel/control_v11p_sd15_openpose",
             torch_dtype=torch.float16,
         )
         print("Loading tile controlnet...")
@@ -934,7 +934,7 @@ class Predictor(BasePredictor):
             resized_control_images.append(resized_control_image)
 
         # Set up pipiline for second pass
-        pipe = self.cnet_img2img_pipe
+        pipe = self.cnet_tile_pipe
         # Set up scheduler on new pipeline
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 
@@ -969,11 +969,15 @@ class Predictor(BasePredictor):
                 "num_inference_steps": second_pass_steps,
                 "image": resized_first_pass_image,
                 "strength": second_pass_strength,
+                "control_image": resized_first_pass_image,
+                "width": resized_first_pass_image.size[0],
+                "height":resized_first_pass_image.size[1],
             }
 
-            if control_image and not disable_cn_second_pass:
-                control_image = resized_control_images[idx % len(control_images)]
-                second_pass_args["control_image"] = control_image
+
+        #    if control_image and not disable_cn_second_pass:
+        #         control_image = resized_control_images[idx % len(control_images)]
+        #         second_pass_args["control_image"] = control_image
 
             # Debug: Print final second_pass_args before passing to the pipeline
             print("Final 'second_pass_args':")

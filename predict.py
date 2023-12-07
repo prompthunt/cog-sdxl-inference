@@ -921,16 +921,16 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield swapped_image_path
 
-        # Resize all initial images by 1.5, these will be used as base images for second pass
+        # Resize all initial images by 2, these will be used as base images for second pass
         resized_first_pass_images = []
         for idx, first_pass_image in enumerate(first_pass_face_swapped_images):
-            resized_image = resize_for_condition_image(first_pass_image, 1.5)
+            resized_image = resize_for_condition_image(first_pass_image, 2)
             resized_first_pass_images.append(resized_image)
 
         # Resize all pose images too
         resized_control_images = []
         for idx, control_image in enumerate(control_images):
-            resized_control_image = resize_for_condition_image(control_image, 1.5)
+            resized_control_image = resize_for_condition_image(control_image, 2)
             resized_control_images.append(resized_control_image)
 
         # Set up pipiline for second pass
@@ -1017,7 +1017,7 @@ class Predictor(BasePredictor):
                 cropped_mask,
                 left_top,
                 orig_size,
-            ) = crop_faces_to_square(second_pass_image, face_masks[idx], 1.5)
+            ) = crop_faces_to_square(second_pass_image, face_masks[idx], 2)
             head_mask = get_head_mask(cropped_face, mask_blur_amount)
             output_path = f"/tmp/second-pass-head-mask-{idx + 1}.png"
             head_mask.save(output_path)

@@ -1045,6 +1045,9 @@ class Predictor(BasePredictor):
             cropped_face_face_swapped = self.swap_face(
                 cropped_face_path, source_images[idx % len(source_images)]
             )
+            # If no cropped face face swapped or if its None, skip
+            if not cropped_face_face_swapped or cropped_face_face_swapped is None:
+                continue
             cropped_face_face_swapped_output_path = (
                 f"/tmp/second-pass-cropped-face-face-swapped-{idx + 1}.png"
             )

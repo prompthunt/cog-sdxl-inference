@@ -275,11 +275,6 @@ def paste_inpaint_into_original_image(
     :param image_to_paste: The image to paste into the original image.
     :return: The final merged image.
     """
-    # Debug: Print input parameters
-    print("Original Image Size:", original_image.size)
-    print("Left Top Coordinates:", left_top)
-    print("Paste Image Size:", image_to_paste.size)
-    print("Paste Size:", paste_size)
 
     # # Resize the image to be pasted to the specified paste size
     # image_to_paste = image_to_paste.resize(paste_size, Image.Resampling.LANCZOS)

@@ -837,6 +837,18 @@ class Predictor(BasePredictor):
         codeformer_face_swapped_images = []
         codeformer_face_swapped_image_paths = []
 
+        # Go through images, if size is not equalual to width and height set, then resize them to match
+        for idx, image in enumerate(images):
+            if image.size[0] != width or image.size[1] != height:
+                images[idx] = image.resize((width, height), resample=Image.LANCZOS)
+
+        # Do the same for control images
+        for idx, control_image in enumerate(control_images):
+            if control_image.size[0] != width or control_image.size[1] != height:
+                control_images[idx] = control_image.resize(
+                    (width, height), resample=Image.LANCZOS
+                )
+
         # First we run base generation and save output files and paths
         for idx in range(num_outputs):
             this_seed = seed + idx
@@ -1107,35 +1119,35 @@ class Predictor(BasePredictor):
         #     if show_debug_images:
         #         yield pasted_image_path
 
-            # upscaled_image_path = inference_app(
-            #     image=pasted_image_path,
-            #     background_enhance=True,
-            #     face_upsample=False,
-            #     upscale=upscale_final_size,
-            #     codeformer_fidelity=upscale_fidelity,
-            # )
-            # new_path = f"/tmp/codeformer-{idx + 1}.png"
-            # shutil.copyfile(upscaled_image_path, new_path)
-            # path_to_output = Path(new_path)
-            # if show_debug_images:
-            #     yield path_to_output
+        # upscaled_image_path = inference_app(
+        #     image=pasted_image_path,
+        #     background_enhance=True,
+        #     face_upsample=False,
+        #     upscale=upscale_final_size,
+        #     codeformer_fidelity=upscale_fidelity,
+        # )
+        # new_path = f"/tmp/codeformer-{idx + 1}.png"
+        # shutil.copyfile(upscaled_image_path, new_path)
+        # path_to_output = Path(new_path)
+        # if show_debug_images:
+        #     yield path_to_output
 
-            # codeformer_image_paths.append(path_to_output)
+        # codeformer_image_paths.append(path_to_output)
 
-            # upscaled_image_path_with_face_enhance = inference_app(
-            #     image=pasted_image_path,
-            #     background_enhance=True,
-            #     face_upsample=True,
-            #     upscale=upscale_final_size,
-            #     codeformer_fidelity=upscale_fidelity,
-            # )
-            # new_path = f"/tmp/codeformer-face-swapped-face-{idx + 1}.png"
-            # shutil.copyfile(upscaled_image_path_with_face_enhance, new_path)
-            # path_to_output = Path(new_path)
-            # codeformer_face_swapped_image_paths.append(path_to_output)
+        # upscaled_image_path_with_face_enhance = inference_app(
+        #     image=pasted_image_path,
+        #     background_enhance=True,
+        #     face_upsample=True,
+        #     upscale=upscale_final_size,
+        #     codeformer_fidelity=upscale_fidelity,
+        # )
+        # new_path = f"/tmp/codeformer-face-swapped-face-{idx + 1}.png"
+        # shutil.copyfile(upscaled_image_path_with_face_enhance, new_path)
+        # path_to_output = Path(new_path)
+        # codeformer_face_swapped_image_paths.append(path_to_output)
 
-            # if show_debug_images:
-            #     yield path_to_output
+        # if show_debug_images:
+        #     yield path_to_output
 
         # # Codeformer upscale all second pass images
         # for idx, image_path in enumerate(second_pass_image_paths):

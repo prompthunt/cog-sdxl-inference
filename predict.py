@@ -906,206 +906,206 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield path_to_output
 
-        # # Swap faces on all first pass images
-        # for idx, first_pass_image_path in enumerate(first_pass_image_paths):
-        #     source_image_to_use = source_images[idx % len(source_images)]
+        # Swap faces on all first pass images
+        for idx, first_pass_image_path in enumerate(first_pass_image_paths):
+            source_image_to_use = source_images[idx % len(source_images)]
 
-        #     output_path = f"/tmp/first-pass-face-swapped-face-{idx + 1}.png"
-        #     swapped_image = self.swap_face(first_pass_image_path, source_image_to_use)
-        #     # Save swapped image and add path to first_pass_face_swapped_images
-        #     swapped_image.save(output_path)
-        #     swapped_image_path = Path(output_path)
-        #     first_pass_face_swapped_images.append(swapped_image)
-        #     first_pass_face_swapped_image_paths.append(swapped_image_path)
-        #     # If show_debug_images or no upscale
+            output_path = f"/tmp/first-pass-face-swapped-face-{idx + 1}.png"
+            swapped_image = self.swap_face(first_pass_image_path, source_image_to_use)
+            # Save swapped image and add path to first_pass_face_swapped_images
+            swapped_image.save(output_path)
+            swapped_image_path = Path(output_path)
+            first_pass_face_swapped_images.append(swapped_image)
+            first_pass_face_swapped_image_paths.append(swapped_image_path)
+            # If show_debug_images or no upscale
+            if show_debug_images:
+                yield swapped_image_path
+
+        # # Resize all initial images by 1.5, these will be used as base images for second pass
+        # resized_first_pass_images = []
+        # for idx, first_pass_image in enumerate(first_pass_images):
+        #     resized_image = resize_for_condition_image(first_pass_image, 1.5)
+        #     resized_first_pass_images.append(resized_image)
+
+        # # Resize all pose images too
+        # resized_control_images = []
+        # for idx, control_image in enumerate(control_images):
+        #     resized_control_image = resize_for_condition_image(control_image, 1.5)
+        #     resized_control_images.append(resized_control_image)
+
+        # # Set up pipiline for second pass
+        # pipe = self.cnet_img2img_pipe
+        # # Set up scheduler on new pipeline
+        # pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
+
+        # # Run second passes
+        # for idx, resized_first_pass_image in enumerate(resized_first_pass_images):
+        #     # Get new seed and generator
+        #     this_seed = seed + idx + 1000
+        #     generator = torch.Generator("cuda").manual_seed(this_seed)
+
+        #     # Pick a prompt round robin
+        #     prompt = prompts[idx % len(prompts)]
+
+        #     if prompt:
+        #         conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+        #         if not negative_prompt:
+        #             negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+        #         negative_conditioning = self.compel_proc.build_conditioning_tensor(
+        #             negative_prompt
+        #         )
+        #         [
+        #             prompt_embeds,
+        #             negative_prompt_embeds,
+        #         ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+        #             [conditioning, negative_conditioning]
+        #         )
+
+        #     second_pass_args = {
+        #         "prompt_embeds": prompt_embeds,
+        #         "negative_prompt_embeds": negative_prompt_embeds,
+        #         "guidance_scale": second_pass_guidance_scale,
+        #         "generator": generator,
+        #         "num_inference_steps": second_pass_steps,
+        #         "image": resized_first_pass_image,
+        #         "strength": second_pass_strength,
+        #         "control_image": resized_control_images[
+        #             idx % len(resized_control_images)
+        #         ],
+        #         "width": resized_first_pass_image.size[0],
+        #         "height": resized_first_pass_image.size[1],
+        #     }
+
+        #     # Debug: Print final second_pass_args before passing to the pipeline
+        #     print("Final 'second_pass_args':")
+        #     for key, value in second_pass_args.items():
+        #         if isinstance(value, Image.Image):
+        #             print(f"{key}: Image.Image of size {value.size}")
+        #         else:
+        #             print(f"{key}: {type(value)}")
+
+        #     output = pipe(**second_pass_args)
+
+        #     second_pass_images.append(output.images[0])
+        #     output_path = f"/tmp/second-pass-seed-{this_seed}.png"
+        #     output.images[0].save(output_path)
+        #     path_to_output = Path(output_path)
+        #     second_pass_image_paths.append(path_to_output)
         #     if show_debug_images:
-        #         yield swapped_image_path
+        #         yield path_to_output
 
-        # Resize all initial images by 1.5, these will be used as base images for second pass
-        resized_first_pass_images = []
-        for idx, first_pass_image in enumerate(first_pass_images):
-            resized_image = resize_for_condition_image(first_pass_image, 1.5)
-            resized_first_pass_images.append(resized_image)
+        # # Next step
+        # # - get masks and locate faces
+        # # - get head masks
+        # # - run inpainting (face fix)
+        # # - return result
 
-        # Resize all pose images too
-        resized_control_images = []
-        for idx, control_image in enumerate(control_images):
-            resized_control_image = resize_for_condition_image(control_image, 1.5)
-            resized_control_images.append(resized_control_image)
+        # # Get head mask for all second pass images
+        # second_pass_head_masks = []
+        # second_pass_head_masks_paths = []
 
-        # Set up pipiline for second pass
-        pipe = self.cnet_img2img_pipe
-        # Set up scheduler on new pipeline
-        pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
+        # # These are the smaller ones
+        # face_masks = face_mask_google_mediapipe(second_pass_images)
 
-        # Run second passes
-        for idx, resized_first_pass_image in enumerate(resized_first_pass_images):
-            # Get new seed and generator
-            this_seed = seed + idx + 1000
-            generator = torch.Generator("cuda").manual_seed(this_seed)
+        # # Get all head masks
+        # for idx, second_pass_image in enumerate(second_pass_images):
+        #     (
+        #         cropped_face,
+        #         cropped_mask,
+        #         left_top,
+        #         orig_size,
+        #     ) = crop_faces_to_square(second_pass_image, face_masks[idx], 2)
+        #     head_mask = get_head_mask(cropped_face, mask_blur_amount)
+        #     output_path = f"/tmp/second-pass-head-mask-{idx + 1}.png"
+        #     head_mask.save(output_path)
+        #     second_pass_head_masks.append(head_mask)
+        #     second_pass_head_masks_paths.append(Path(output_path))
 
-            # Pick a prompt round robin
-            prompt = prompts[idx % len(prompts)]
+        #     cropped_face_output_path = f"/tmp/second-pass-cropped-face-{idx + 1}.png"
+        #     cropped_face.save(cropped_face_output_path)
+        #     cropped_face_path = Path(cropped_face_output_path)
 
-            if prompt:
-                conditioning = self.compel_proc.build_conditioning_tensor(prompt)
-                if not negative_prompt:
-                    negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
-                negative_conditioning = self.compel_proc.build_conditioning_tensor(
-                    negative_prompt
-                )
-                [
-                    prompt_embeds,
-                    negative_prompt_embeds,
-                ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
-                    [conditioning, negative_conditioning]
-                )
+        #     cropped_mask_output_path = f"/tmp/second-pass-cropped-mask-{idx + 1}.png"
+        #     cropped_mask.save(cropped_mask_output_path)
+        #     cropped_mask_path = Path(cropped_mask_output_path)
 
-            second_pass_args = {
-                "prompt_embeds": prompt_embeds,
-                "negative_prompt_embeds": negative_prompt_embeds,
-                "guidance_scale": second_pass_guidance_scale,
-                "generator": generator,
-                "num_inference_steps": second_pass_steps,
-                "image": resized_first_pass_image,
-                "strength": second_pass_strength,
-                "control_image": resized_control_images[
-                    idx % len(resized_control_images)
-                ],
-                "width": resized_first_pass_image.size[0],
-                "height": resized_first_pass_image.size[1],
-            }
+        #     if show_debug_images:
+        #         yield Path(cropped_mask_path)
+        #         yield Path(cropped_face_path)
+        #         yield Path(output_path)
 
-            # Debug: Print final second_pass_args before passing to the pipeline
-            print("Final 'second_pass_args':")
-            for key, value in second_pass_args.items():
-                if isinstance(value, Image.Image):
-                    print(f"{key}: Image.Image of size {value.size}")
-                else:
-                    print(f"{key}: {type(value)}")
+        #     # this_seed = seed + idx + 2000
+        #     # generator = torch.Generator("cuda").manual_seed(this_seed)
+        #     # print(f"Prompt: {prompt}")
+        #     # print(f"Negative Prompt: {negative_prompt}")
 
-            output = pipe(**second_pass_args)
+        #     # # Pick a prompt round robin
+        #     # prompt = prompts[idx % len(prompts)]
 
-            second_pass_images.append(output.images[0])
-            output_path = f"/tmp/second-pass-seed-{this_seed}.png"
-            output.images[0].save(output_path)
-            path_to_output = Path(output_path)
-            second_pass_image_paths.append(path_to_output)
-            if show_debug_images:
-                yield path_to_output
+        #     # cropped face face swap
+        #     cropped_face_face_swapped = self.swap_face(
+        #         cropped_face_path, source_images[idx % len(source_images)]
+        #     )
+        #     # If no cropped face face swapped or if its None, skip
+        #     if not cropped_face_face_swapped or cropped_face_face_swapped is None:
+        #         continue
+        #     cropped_face_face_swapped_output_path = (
+        #         f"/tmp/second-pass-cropped-face-face-swapped-{idx + 1}.png"
+        #     )
+        #     cropped_face_face_swapped.save(cropped_face_face_swapped_output_path)
+        #     cropped_face_face_swapped_path = Path(cropped_face_face_swapped_output_path)
+        #     if show_debug_images:
+        #         yield cropped_face_face_swapped_path
 
-        # Next step
-        # - get masks and locate faces
-        # - get head masks
-        # - run inpainting (face fix)
-        # - return result
+        #     # if prompt:
+        #     #     conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+        #     #     if not negative_prompt:
+        #     #         negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+        #     #     negative_conditioning = self.compel_proc.build_conditioning_tensor(
+        #     #         negative_prompt
+        #     #     )
+        #     #     [
+        #     #         prompt_embeds,
+        #     #         negative_prompt_embeds,
+        #     #     ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+        #     #         [conditioning, negative_conditioning]
+        #     #     )
 
-        # Get head mask for all second pass images
-        second_pass_head_masks = []
-        second_pass_head_masks_paths = []
+        #     # inpainted_image = self.inpaint_pipe(
+        #     #     prompt_embeds=prompt_embeds,
+        #     #     negative_prompt_embeds=negative_prompt_embeds,
+        #     #     image=cropped_face_face_swapped,
+        #     #     mask_image=head_mask,
+        #     #     strength=inpaint_strength,
+        #     #     num_inference_steps=inpaint_steps,
+        #     #     guidance_scale=inpaint_guidance_scale,
+        #     #     generator=generator,
+        #     # ).images[0]
 
-        # These are the smaller ones
-        face_masks = face_mask_google_mediapipe(second_pass_images)
+        #     # inpainted_image_output_path = (
+        #     #     f"/tmp/second-pass-inpainted-image-{idx + 1}.png"
+        #     # )
+        #     # inpainted_image.save(inpainted_image_output_path)
+        #     # inpainted_image_path = Path(inpainted_image_output_path)
 
-        # Get all head masks
-        for idx, second_pass_image in enumerate(second_pass_images):
-            (
-                cropped_face,
-                cropped_mask,
-                left_top,
-                orig_size,
-            ) = crop_faces_to_square(second_pass_image, face_masks[idx], 2)
-            head_mask = get_head_mask(cropped_face, mask_blur_amount)
-            output_path = f"/tmp/second-pass-head-mask-{idx + 1}.png"
-            head_mask.save(output_path)
-            second_pass_head_masks.append(head_mask)
-            second_pass_head_masks_paths.append(Path(output_path))
+        #     # yield inpainted_image_path
 
-            cropped_face_output_path = f"/tmp/second-pass-cropped-face-{idx + 1}.png"
-            cropped_face.save(cropped_face_output_path)
-            cropped_face_path = Path(cropped_face_output_path)
+        #     pasted_image = paste_inpaint_into_original_image(
+        #         second_pass_image,
+        #         left_top,
+        #         cropped_face_face_swapped,
+        #         orig_size,
+        #         head_mask,
+        #     )
+        #     pasted_image_output_path = (
+        #         f"/tmp/second-pass-face-swapped-face-{idx + 1}.png"
+        #     )
+        #     pasted_image.save(pasted_image_output_path)
+        #     pasted_image_path = Path(pasted_image_output_path)
+        #     second_pass_face_swapped_image_paths.append(pasted_image_path)
 
-            cropped_mask_output_path = f"/tmp/second-pass-cropped-mask-{idx + 1}.png"
-            cropped_mask.save(cropped_mask_output_path)
-            cropped_mask_path = Path(cropped_mask_output_path)
-
-            if show_debug_images:
-                yield Path(cropped_mask_path)
-                yield Path(cropped_face_path)
-                yield Path(output_path)
-
-            # this_seed = seed + idx + 2000
-            # generator = torch.Generator("cuda").manual_seed(this_seed)
-            # print(f"Prompt: {prompt}")
-            # print(f"Negative Prompt: {negative_prompt}")
-
-            # # Pick a prompt round robin
-            # prompt = prompts[idx % len(prompts)]
-
-            # cropped face face swap
-            cropped_face_face_swapped = self.swap_face(
-                cropped_face_path, source_images[idx % len(source_images)]
-            )
-            # If no cropped face face swapped or if its None, skip
-            if not cropped_face_face_swapped or cropped_face_face_swapped is None:
-                continue
-            cropped_face_face_swapped_output_path = (
-                f"/tmp/second-pass-cropped-face-face-swapped-{idx + 1}.png"
-            )
-            cropped_face_face_swapped.save(cropped_face_face_swapped_output_path)
-            cropped_face_face_swapped_path = Path(cropped_face_face_swapped_output_path)
-            if show_debug_images:
-                yield cropped_face_face_swapped_path
-
-            # if prompt:
-            #     conditioning = self.compel_proc.build_conditioning_tensor(prompt)
-            #     if not negative_prompt:
-            #         negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
-            #     negative_conditioning = self.compel_proc.build_conditioning_tensor(
-            #         negative_prompt
-            #     )
-            #     [
-            #         prompt_embeds,
-            #         negative_prompt_embeds,
-            #     ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
-            #         [conditioning, negative_conditioning]
-            #     )
-
-            # inpainted_image = self.inpaint_pipe(
-            #     prompt_embeds=prompt_embeds,
-            #     negative_prompt_embeds=negative_prompt_embeds,
-            #     image=cropped_face_face_swapped,
-            #     mask_image=head_mask,
-            #     strength=inpaint_strength,
-            #     num_inference_steps=inpaint_steps,
-            #     guidance_scale=inpaint_guidance_scale,
-            #     generator=generator,
-            # ).images[0]
-
-            # inpainted_image_output_path = (
-            #     f"/tmp/second-pass-inpainted-image-{idx + 1}.png"
-            # )
-            # inpainted_image.save(inpainted_image_output_path)
-            # inpainted_image_path = Path(inpainted_image_output_path)
-
-            # yield inpainted_image_path
-
-            pasted_image = paste_inpaint_into_original_image(
-                second_pass_image,
-                left_top,
-                cropped_face_face_swapped,
-                orig_size,
-                head_mask,
-            )
-            pasted_image_output_path = (
-                f"/tmp/second-pass-face-swapped-face-{idx + 1}.png"
-            )
-            pasted_image.save(pasted_image_output_path)
-            pasted_image_path = Path(pasted_image_output_path)
-            second_pass_face_swapped_image_paths.append(pasted_image_path)
-
-            if show_debug_images:
-                yield pasted_image_path
+        #     if show_debug_images:
+        #         yield pasted_image_path
 
             # upscaled_image_path = inference_app(
             #     image=pasted_image_path,

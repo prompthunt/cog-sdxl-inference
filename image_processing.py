@@ -215,7 +215,9 @@ def _crop_to_square_and_bounding_box(
 
     # Resize if required
     if resize_to:
-        image = image.resize((resize_to, resize_to), Image.Resampling.LANCZOS)
+        # Resize only if current size is smaller than the resize_to value
+        if image.size[0] < resize_to:
+            image = image.resize((resize_to, resize_to), Image.Resampling.LANCZOS)
 
     # Third arg is width and height of bounding box
     return image, (left, top), (right - left, bottom - top)
@@ -279,8 +281,14 @@ def paste_inpaint_into_original_image(
     print("Paste Image Size:", image_to_paste.size)
     print("Paste Size:", paste_size)
 
-    # Resize the image to be pasted to the specified paste size
-    image_to_paste = image_to_paste.resize(paste_size, Image.Resampling.LANCZOS)
+    # # Resize the image to be pasted to the specified paste size
+    # image_to_paste = image_to_paste.resize(paste_size, Image.Resampling.LANCZOS)
+
+    # Resize using cv2 for downsizing
+    image_to_paste = cv2.resize(
+        np.array(image_to_paste), paste_size, interpolation=cv2.INTER_AREA
+    )
+    image_to_paste = Image.fromarray(image_to_paste)
 
     # Debug: Print resized image size
     print("Resized Image Size:", image_to_paste.size)
@@ -293,7 +301,8 @@ def paste_inpaint_into_original_image(
 
     # Prepare mask if provided
     if mask:
-        mask = mask.resize(paste_size, Image.Resampling.LANCZOS)
+        mask = cv2.resize(np.array(mask), paste_size, interpolation=cv2.INTER_AREA)
+        mask = Image.fromarray(mask)
         mask = mask.convert("L")
 
     # Debug: Print mask size (if provided)

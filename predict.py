@@ -653,6 +653,50 @@ class Predictor(BasePredictor):
             description="Source image for face swap",
             default=None,
         ),
+        source_image_5: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_6: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_7: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_8: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_9: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_10: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_11: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_12: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_13: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_14: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
+        source_image_15: Path = Input(
+            description="Source image for face swap",
+            default=None,
+        ),
         disable_cn_second_pass: bool = Input(
             description="Disable controlnet second pass",
             default=False,
@@ -811,6 +855,17 @@ class Predictor(BasePredictor):
             source_image_2,
             source_image_3,
             source_image_4,
+            source_image_5,
+            source_image_6,
+            source_image_7,
+            source_image_8,
+            source_image_9,
+            source_image_10,
+            source_image_11,
+            source_image_12,
+            source_image_13,
+            source_image_14,
+            source_image_15,
         ]
         # Remove non existent source images
         source_images = [x for x in source_images if x]

@@ -991,7 +991,7 @@ class Predictor(BasePredictor):
             # Pick a prompt round robin
             prompt = prompts[idx % len(prompts)]
             if root_prompt:
-                prompt = f"{prompt}, {root_prompt}
+                prompt = f"{prompt}, {root_prompt}"
             
             # Add prompt to list
             second_pass_prompts.append(prompt)

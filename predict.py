@@ -1028,7 +1028,7 @@ class Predictor(BasePredictor):
         # Resize all second pass images by 2, these will be used as base images for second pass
         resized_second_pass_images = []
         for idx, second_pass_image in enumerate(second_pass_images):
-            resized_image = self.upscale_image_pil(second_pass_image)
+            resized_image = resize_for_condition_image(second_pass_image, 2)
             resized_second_pass_images.append(resized_image)
 
         # Resize all pose images too

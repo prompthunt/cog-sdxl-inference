@@ -1288,25 +1288,51 @@ class Predictor(BasePredictor):
         )
 
         # Output is object with key value pairs key being filename and value being cloudflare uploaded url
-        final_output = {}
+        final_output = []
+        cf_images = {}
 
         # Upload to cloudflare
         if cf_acc_id and cf_api_key:
-            for image_path in all_image_paths:
-                try:
-                    # Id is uuid + the image filename
-                    filename = str(image_path).split("/")[-1]
-                    id = str(uuid.uuid4()) + "-" + filename
-                    cf_url = upload_to_cloudflare(
-                        id,
-                        str(image_path),
-                        cf_acc_id,
-                        cf_api_key,
-                    )
-                    print("Uploaded to Cloudflare:", cf_url)
-                    final_output[filename] = cf_url
-                except Exception as e:
-                    print("Failed to upload to Cloudflare", str(e))
+            for idx in range(num_outputs):
+                this_seed = seed + idx
+
+                # Pick a prompt round robin
+                prompt = prompts[idx % len(prompts)]
+
+                first_pass_image = first_pass_image_paths[idx]
+                second_pass_image = second_pass_image_paths[idx]
+                third_pass_image = third_pass_image_paths[idx]
+
+                cf_first_pass_image_url = upload_to_cloudflare(
+                    f"first-pass-seed-{this_seed}.png",
+                    str(first_pass_image),
+                    cf_acc_id,
+                    cf_api_key,
+                )
+
+                cf_second_pass_image_url = upload_to_cloudflare(
+                    f"second-pass-seed-{this_seed}.png",
+                    str(second_pass_image),
+                    cf_acc_id,
+                    cf_api_key,
+                )
+
+                cf_third_pass_image_url = upload_to_cloudflare(
+                    f"third-pass-seed-{this_seed}.png",
+                    str(third_pass_image),
+                    cf_acc_id,
+                    cf_api_key,
+                )
+
+                final_output.append(
+                    {
+                        "seed": this_seed,
+                        "prompt": prompt,
+                        "first_pass": cf_first_pass_image_url,
+                        "second_pass": cf_second_pass_image_url,
+                        "third_pass": cf_third_pass_image_url,
+                    }
+                )
 
         # Return the final output
         yield final_output

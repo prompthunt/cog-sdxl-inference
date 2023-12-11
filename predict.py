@@ -865,6 +865,10 @@ class Predictor(BasePredictor):
         third_pass_images = []
         third_pass_image_paths = []
 
+        first_pass_prompts = [];
+        second_pass_prompts = [];
+        third_pass_prompts = [];
+
         # First we run base generation and save output files and paths
         for idx in range(num_outputs):
             this_seed = seed + idx
@@ -877,6 +881,9 @@ class Predictor(BasePredictor):
             # Add root prompt if specified
             if root_prompt:
                 prompt = f"{prompt}, {root_prompt}"
+
+            # Add prompt to list
+            first_pass_prompts.append(prompt)
 
             if prompt:
                 conditioning = self.compel_proc.build_conditioning_tensor(prompt)
@@ -985,6 +992,9 @@ class Predictor(BasePredictor):
             prompt = prompts[idx % len(prompts)]
             if root_prompt:
                 prompt = f"{prompt}, {root_prompt}
+            
+            # Add prompt to list
+            second_pass_prompts.append(prompt)
 
             if prompt:
                 conditioning = self.compel_proc.build_conditioning_tensor(prompt)
@@ -1062,6 +1072,9 @@ class Predictor(BasePredictor):
 
             # Pick a prompt round robin
             prompt = prompts[idx % len(prompts)]
+
+            # Add prompt to list
+            third_pass_prompts.append(prompt)
 
             if prompt:
                 conditioning = self.compel_proc.build_conditioning_tensor(prompt)
@@ -1302,9 +1315,6 @@ class Predictor(BasePredictor):
             for idx in range(num_outputs):
                 this_seed = seed + idx
 
-                # Pick a prompt round robin
-                prompt = prompts[idx % len(prompts)]
-
                 first_pass_image = first_pass_image_paths[idx]
                 second_pass_image = second_pass_image_paths[idx]
                 third_pass_image = third_pass_image_paths[idx]
@@ -1333,10 +1343,18 @@ class Predictor(BasePredictor):
                 final_output.append(
                     {
                         "seed": this_seed,
-                        "prompt": prompt,
-                        "first_pass": cf_first_pass_image_url,
-                        "second_pass": cf_second_pass_image_url,
-                        "third_pass": cf_third_pass_image_url,
+                        "first_pass": {
+                            "prompt": first_pass_prompts[idx],
+                            "image": cf_first_pass_image_url,
+                        },
+                        "second_pass": {
+                            "prompt": second_pass_prompts[idx],
+                            "image": cf_second_pass_image_url,
+                        },
+                        "third_pass": {
+                            "prompt": third_pass_prompts[idx],
+                            "image": cf_third_pass_image_url,
+                        }
                     }
                 )
 

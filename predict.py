@@ -135,9 +135,6 @@ class Predictor(BasePredictor):
                 weight=weight,
             )
 
-            # Convert from BGR to RGB
-            output_rgb = cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
-
             # Convert numpy array back to PIL Image
             pil_image = Image.fromarray(output_rgb)
 

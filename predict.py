@@ -1031,7 +1031,7 @@ class Predictor(BasePredictor):
         # Resize all second pass images by 2, these will be used as base images for second pass
         resized_second_pass_images = []
         for idx, second_pass_image in enumerate(second_pass_images):
-            resized_image = resize_for_condition_image(second_pass_image, 2)
+            resized_image = self.upscale_image_pil(second_pass_image)
             resized_second_pass_images.append(resized_image)
 
         # Resize all pose images too
@@ -1044,7 +1044,7 @@ class Predictor(BasePredictor):
         ]
 
         # Set up pipiline for second pass
-        pipe = self.cnet_img2img_pipe
+        pipe = self.cnet_tile_pipe
         # # Set up scheduler on new pipeline
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 
@@ -1079,12 +1079,10 @@ class Predictor(BasePredictor):
                 "num_inference_steps": third_pass_steps,
                 "image": resized_second_pass_image,
                 "strength": third_pass_strength,
-                "control_image": processed_control_images[
-                    idx % len(processed_control_images)
-                ],
+                "control_image": resized_second_pass_image,
                 "width": resized_second_pass_image.size[0],
                 "height": resized_second_pass_image.size[1],
-                "controlnet_conditioning_scale": pose_strength,
+                "controlnet_conditioning_scale": third_pass_strength,
             }
 
             # Debug: Print final second_pass_args before passing to the pipeline

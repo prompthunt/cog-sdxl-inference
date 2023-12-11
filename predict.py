@@ -490,6 +490,10 @@ class Predictor(BasePredictor):
             description="Input prompt",
             default="photo of cjw person",
         ),
+        root_prompt: str = Input(
+            description="Root prompt",
+            default=None,
+        ),
         negative_prompt: str = Input(
             description="Specify things to not see in the output. Supported embeddings: "
             + ", ".join(EMBEDDING_TOKENS),
@@ -870,6 +874,9 @@ class Predictor(BasePredictor):
 
             # Pick a prompt round robin
             prompt = prompts[idx % len(prompts)]
+            # Add root prompt if specified
+            if root_prompt:
+                prompt = f"{prompt}, {root_prompt}"
 
             if prompt:
                 conditioning = self.compel_proc.build_conditioning_tensor(prompt)
@@ -976,6 +983,8 @@ class Predictor(BasePredictor):
 
             # Pick a prompt round robin
             prompt = prompts[idx % len(prompts)]
+            if root_prompt:
+                prompt = f"{prompt}, {root_prompt}
 
             if prompt:
                 conditioning = self.compel_proc.build_conditioning_tensor(prompt)

@@ -790,6 +790,12 @@ class Predictor(BasePredictor):
                 )
         processed_control_images = [self.process_control(x) for x in control_images]
 
+        extra_kwargs = {
+            "width": width,
+            "height": height,
+        }
+
+
         if control_image and image:
             print("Using ControlNet img2img")
             pipe = self.cnet_img2img_pipe
@@ -800,11 +806,7 @@ class Predictor(BasePredictor):
             print("Using img2img pipeline")
         else:
             print("Using txt2img pipeline")
-            pipe = self.txt2img_pipe
-            extra_kwargs = {
-                "width": width,
-                "height": height,
-            }
+            pipe = self.txt2img_pipe}
 
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 

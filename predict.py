@@ -860,8 +860,8 @@ class Predictor(BasePredictor):
         second_pass_with_face_swap_base_image_paths = []
         codeformer_images = []
         codeformer_image_paths = []
-        codeformer_face_swapped_images = []
-        codeformer_face_swapped_image_paths = []
+        third_pass_face_swapped_images = []
+        third_pass_face_swapped_image_paths = []
         third_pass_images = []
         third_pass_image_paths = []
 
@@ -1260,7 +1260,7 @@ class Predictor(BasePredictor):
         # new_path = f"/tmp/codeformer-face-swapped-face-{idx + 1}.png"
         # shutil.copyfile(upscaled_image_path_with_face_enhance, new_path)
         # path_to_output = Path(new_path)
-        # codeformer_face_swapped_image_paths.append(path_to_output)
+        # third_pass_face_swapped_image_paths.append(path_to_output)
 
         # if show_debug_images:
         #     yield path_to_output
@@ -1283,27 +1283,27 @@ class Predictor(BasePredictor):
         #     if show_debug_images:
         #         yield path_to_output
 
-        # # Swap faces on all codeformer images
-        # for idx, codeformer_image_path in enumerate(codeformer_image_paths):
-        #     source_image_to_use = source_images[idx % len(source_images)]
+        # Swap faces on all codeformer images
+        for idx, third_pass_image_path in enumerate(third_pass_image_paths):
+            source_image_to_use = source_images[idx % len(source_images)]
 
-        #     output_path = f"/tmp/codeformer-face-swapped-face-{idx + 1}.png"
-        #     swapped_image = self.swap_face(codeformer_image_path, source_image_to_use)
-        #     # Save swapped image and add path to swapped_faces_images
-        #     swapped_image.save(output_path)
-        #     swapped_image_path = Path(output_path)
-        #     codeformer_face_swapped_images.append(swapped_image)
-        #     codeformer_face_swapped_image_paths.append(swapped_image_path)
+            output_path = f"/tmp/third-pass-face-swapped-face-{idx + 1}.png"
+            swapped_image = self.swap_face(third_pass_image_path, source_image_to_use)
+            # Save swapped image and add path to swapped_faces_images
+            swapped_image.save(output_path)
+            swapped_image_path = Path(output_path)
+            third_pass_face_swapped_images.append(swapped_image)
+            third_pass_face_swapped_image_paths.append(swapped_image_path)
 
-        #     # If show_debug_images or no upscale
-        #     if show_debug_images:
-        #         yield swapped_image_path
+            # If show_debug_images or no upscale
+            if show_debug_images:
+                yield swapped_image_path
 
         # # Upload all outputs to Cloudflare
 
         # Combine all paths
         all_image_paths = (
-            first_pass_image_paths + second_pass_image_paths + third_pass_image_paths
+            first_pass_image_paths + second_pass_image_paths + third_pass_image_paths 
         )
 
         # Output is object with key value pairs key being filename and value being cloudflare uploaded url
@@ -1318,6 +1318,7 @@ class Predictor(BasePredictor):
                 first_pass_image = first_pass_image_paths[idx]
                 second_pass_image = second_pass_image_paths[idx]
                 third_pass_image = third_pass_image_paths[idx]
+                face_swapped_image = third_pass_face_swapped_image_paths[idx]
 
                 cf_first_pass_image_url = upload_to_cloudflare(
                     f"first-pass-seed-{this_seed}.png",
@@ -1340,6 +1341,13 @@ class Predictor(BasePredictor):
                     cf_api_key,
                 )
 
+                cf_face_swapped_image_url = upload_to_cloudflare(
+                    f"face-swapped-seed-{this_seed}.png",
+                    str(face_swapped_image),
+                    cf_acc_id,
+                    cf_api_key,
+                )
+
                 final_output.append(
                     {
                         "seed": this_seed,
@@ -1354,7 +1362,8 @@ class Predictor(BasePredictor):
                         "third_pass": {
                             "prompt": third_pass_prompts[idx],
                             "image": cf_third_pass_image_url,
-                        }
+                        },
+                        "face_swapped": cf_face_swapped_image_url,
                     }
                 )
 

@@ -795,7 +795,6 @@ class Predictor(BasePredictor):
             "height": height,
         }
 
-
         if control_image and image:
             print("Using ControlNet img2img")
             pipe = self.cnet_img2img_pipe
@@ -806,7 +805,7 @@ class Predictor(BasePredictor):
             print("Using img2img pipeline")
         else:
             print("Using txt2img pipeline")
-            pipe = self.txt2img_pipe}
+            pipe = self.txt2img_pipe
 
         pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 

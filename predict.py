@@ -1035,12 +1035,12 @@ class Predictor(BasePredictor):
             resized_second_pass_images.append(resized_image)
 
         # Resize all pose images too
-        resized_control_images = []
+        again_resized_control_images = []
         for idx, control_image in enumerate(resized_control_images):
             resized_control_image = resize_for_condition_image(control_image, 2)
-            resized_control_images.append(resized_control_image)
+            again_resized_control_images.append(resized_control_image)
         processed_control_images = [
-            self.process_control(x) for x in resized_control_images
+            self.process_control(x) for x in again_resized_control_images
         ]
 
         # Set up pipiline for second pass

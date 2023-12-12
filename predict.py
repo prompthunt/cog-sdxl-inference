@@ -865,9 +865,9 @@ class Predictor(BasePredictor):
         third_pass_images = []
         third_pass_image_paths = []
 
-        first_pass_prompts = [];
-        second_pass_prompts = [];
-        third_pass_prompts = [];
+        first_pass_prompts = []
+        second_pass_prompts = []
+        third_pass_prompts = []
 
         # First we run base generation and save output files and paths
         for idx in range(num_outputs):
@@ -1044,83 +1044,83 @@ class Predictor(BasePredictor):
             if show_debug_images:
                 yield path_to_output
 
-        # Resize all second pass images by 2, these will be used as base images for second pass
-        resized_second_pass_images = []
-        for idx, second_pass_image in enumerate(second_pass_images):
-            resized_image = resize_for_condition_image(second_pass_image, 2)
-            resized_second_pass_images.append(resized_image)
+        # # Resize all second pass images by 2, these will be used as base images for second pass
+        # resized_second_pass_images = []
+        # for idx, second_pass_image in enumerate(second_pass_images):
+        #     resized_image = resize_for_condition_image(second_pass_image, 2)
+        #     resized_second_pass_images.append(resized_image)
 
-        # Resize all pose images too
-        again_resized_control_images = []
-        for idx, control_image in enumerate(resized_control_images):
-            resized_control_image = resize_for_condition_image(control_image, 2)
-            again_resized_control_images.append(resized_control_image)
-        processed_control_images = [
-            self.process_control(x) for x in again_resized_control_images
-        ]
+        # # Resize all pose images too
+        # again_resized_control_images = []
+        # for idx, control_image in enumerate(resized_control_images):
+        #     resized_control_image = resize_for_condition_image(control_image, 2)
+        #     again_resized_control_images.append(resized_control_image)
+        # processed_control_images = [
+        #     self.process_control(x) for x in again_resized_control_images
+        # ]
 
-        # Set up pipiline for second pass
-        pipe = self.cnet_tile_pipe
-        # # Set up scheduler on new pipeline
-        pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
+        # # Set up pipiline for second pass
+        # pipe = self.cnet_tile_pipe
+        # # # Set up scheduler on new pipeline
+        # pipe.scheduler = make_scheduler(scheduler, pipe.scheduler.config)
 
-        # Run third passes
-        for idx, resized_second_pass_image in enumerate(resized_second_pass_images):
-            # Get new seed and generator
-            this_seed = seed + idx
-            generator = torch.Generator("cuda").manual_seed(this_seed)
+        # # Run third passes
+        # for idx, resized_second_pass_image in enumerate(resized_second_pass_images):
+        #     # Get new seed and generator
+        #     this_seed = seed + idx
+        #     generator = torch.Generator("cuda").manual_seed(this_seed)
 
-            # Pick a prompt round robin
-            prompt = prompts[idx % len(prompts)]
+        #     # Pick a prompt round robin
+        #     prompt = prompts[idx % len(prompts)]
 
-            # Add prompt to list
-            third_pass_prompts.append(prompt)
+        #     # Add prompt to list
+        #     third_pass_prompts.append(prompt)
 
-            if prompt:
-                conditioning = self.compel_proc.build_conditioning_tensor(prompt)
-                if not negative_prompt:
-                    negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
-                negative_conditioning = self.compel_proc.build_conditioning_tensor(
-                    negative_prompt
-                )
-                [
-                    prompt_embeds,
-                    negative_prompt_embeds,
-                ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
-                    [conditioning, negative_conditioning]
-                )
+        #     if prompt:
+        #         conditioning = self.compel_proc.build_conditioning_tensor(prompt)
+        #         if not negative_prompt:
+        #             negative_prompt = ""  # it's necessary to create an empty prompt - it can also be very long, if you want
+        #         negative_conditioning = self.compel_proc.build_conditioning_tensor(
+        #             negative_prompt
+        #         )
+        #         [
+        #             prompt_embeds,
+        #             negative_prompt_embeds,
+        #         ] = self.compel_proc.pad_conditioning_tensors_to_same_length(
+        #             [conditioning, negative_conditioning]
+        #         )
 
-            third_pass_args = {
-                "prompt_embeds": prompt_embeds,
-                "negative_prompt_embeds": negative_prompt_embeds,
-                "guidance_scale": third_pass_guidance_scale,
-                "generator": generator,
-                "num_inference_steps": third_pass_steps,
-                "image": resized_second_pass_image,
-                "strength": third_pass_strength,
-                "control_image": resized_second_pass_image,
-                "width": resized_second_pass_image.size[0],
-                "height": resized_second_pass_image.size[1],
-                "controlnet_conditioning_scale": third_pass_strength,
-            }
+        #     third_pass_args = {
+        #         "prompt_embeds": prompt_embeds,
+        #         "negative_prompt_embeds": negative_prompt_embeds,
+        #         "guidance_scale": third_pass_guidance_scale,
+        #         "generator": generator,
+        #         "num_inference_steps": third_pass_steps,
+        #         "image": resized_second_pass_image,
+        #         "strength": third_pass_strength,
+        #         "control_image": resized_second_pass_image,
+        #         "width": resized_second_pass_image.size[0],
+        #         "height": resized_second_pass_image.size[1],
+        #         "controlnet_conditioning_scale": third_pass_strength,
+        #     }
 
-            # Debug: Print final second_pass_args before passing to the pipeline
-            print("Final 'third_pass_args':")
-            for key, value in third_pass_args.items():
-                if isinstance(value, Image.Image):
-                    print(f"{key}: Image.Image of size {value.size}")
-                else:
-                    print(f"{key}: {type(value)}")
+        #     # Debug: Print final second_pass_args before passing to the pipeline
+        #     print("Final 'third_pass_args':")
+        #     for key, value in third_pass_args.items():
+        #         if isinstance(value, Image.Image):
+        #             print(f"{key}: Image.Image of size {value.size}")
+        #         else:
+        #             print(f"{key}: {type(value)}")
 
-            output = pipe(**third_pass_args)
+        #     output = pipe(**third_pass_args)
 
-            third_pass_images.append(output.images[0])
-            output_path = f"/tmp/third-pass-seed-{this_seed}.png"
-            output.images[0].save(output_path)
-            path_to_output = Path(output_path)
-            third_pass_image_paths.append(path_to_output)
-            if show_debug_images:
-                yield path_to_output
+        #     third_pass_images.append(output.images[0])
+        #     output_path = f"/tmp/third-pass-seed-{this_seed}.png"
+        #     output.images[0].save(output_path)
+        #     path_to_output = Path(output_path)
+        #     third_pass_image_paths.append(path_to_output)
+        #     if show_debug_images:
+        #         yield path_to_output
 
         # # Next step
         # # - get masks and locate faces
@@ -1284,16 +1284,16 @@ class Predictor(BasePredictor):
         #         yield path_to_output
 
         # Swap faces on all codeformer images
-        for idx, third_pass_image_path in enumerate(third_pass_image_paths):
+        for idx, second_pass_image_path in enumerate(second_pass_image_paths):
             source_image_to_use = source_images[idx % len(source_images)]
 
-            output_path = f"/tmp/third-pass-face-swapped-face-{idx + 1}.png"
-            swapped_image = self.swap_face(third_pass_image_path, source_image_to_use)
+            output_path = f"/tmp/second-pass-face-swapped-face-{idx + 1}.png"
+            swapped_image = self.swap_face(second_pass_image_path, source_image_to_use)
             # Save swapped image and add path to swapped_faces_images
             swapped_image.save(output_path)
             swapped_image_path = Path(output_path)
-            third_pass_face_swapped_images.append(swapped_image)
-            third_pass_face_swapped_image_paths.append(swapped_image_path)
+            second_pass_face_swapped_images.append(swapped_image)
+            second_pass_face_swapped_image_paths.append(swapped_image_path)
 
             # If show_debug_images or no upscale
             if show_debug_images:
@@ -1317,8 +1317,8 @@ class Predictor(BasePredictor):
 
                 first_pass_image = first_pass_image_paths[idx]
                 second_pass_image = second_pass_image_paths[idx]
-                third_pass_image = third_pass_image_paths[idx]
-                face_swapped_image = third_pass_face_swapped_image_paths[idx]
+                face_swapped_image = second_pass_face_swapped_image_paths[idx]
+                # third_pass_image = third_pass_image_paths[idx]
 
                 cf_first_pass_image_url = upload_to_cloudflare(
                     f"first-pass-seed-{this_seed}.png",
@@ -1334,12 +1334,12 @@ class Predictor(BasePredictor):
                     cf_api_key,
                 )
 
-                cf_third_pass_image_url = upload_to_cloudflare(
-                    f"third-pass-seed-{this_seed}.png",
-                    str(third_pass_image),
-                    cf_acc_id,
-                    cf_api_key,
-                )
+                # cf_third_pass_image_url = upload_to_cloudflare(
+                #     f"third-pass-seed-{this_seed}.png",
+                #     str(third_pass_image),
+                #     cf_acc_id,
+                #     cf_api_key,
+                # )
 
                 cf_face_swapped_image_url = upload_to_cloudflare(
                     f"face-swapped-seed-{this_seed}.png",
@@ -1359,10 +1359,10 @@ class Predictor(BasePredictor):
                             "prompt": second_pass_prompts[idx],
                             "image": cf_second_pass_image_url,
                         },
-                        "third_pass": {
-                            "prompt": third_pass_prompts[idx],
-                            "image": cf_third_pass_image_url,
-                        },
+                        # "third_pass": {
+                        #     "prompt": third_pass_prompts[idx],
+                        #     "image": cf_third_pass_image_url,
+                        # },
                         "face_swapped": cf_face_swapped_image_url,
                     }
                 )
